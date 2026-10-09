@@ -26,7 +26,7 @@
     "typecheck": "npm run build --workspace=@tommasomarchionni/omp-usage-protocol && tsc --noEmit"
   },
   "dependencies": {
-    "uuid": "^11.0.0"
+    "uuid": "^14.0.2"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
