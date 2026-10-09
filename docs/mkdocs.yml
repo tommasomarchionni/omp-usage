@@ -6,6 +6,8 @@ repo_url: https://github.com/tommasomarchionni/omp-usage
 repo_name: tommasomarchionni/omp-usage
 edit_uri: edit/main/docs/
 copyright: Copyright &copy; 2026 Tommaso Marchionni
+docs_dir: .
+site_dir: ../site
 
 theme:
   name: material
