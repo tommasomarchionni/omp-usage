@@ -6,7 +6,7 @@ on:
       target:
         description: "Exporter target (host:port)"
         required: true
-        default: "192.168.188.50:9464"
+        default: "exporter.example.internal:9464"
 
 permissions:
   contents: read

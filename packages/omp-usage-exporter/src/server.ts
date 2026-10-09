@@ -1,7 +1,7 @@
 import http from "node:http";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { parseListen } from "./config.js";
-import type { Registry } from "prom-client";
+import type { Registry } from "@prometheus-io/client";
 import type { OperationalMetrics } from "./metrics.js";
 
 export class ExporterServer {

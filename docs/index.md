@@ -61,7 +61,7 @@ The exporter starts on `http://127.0.0.1:9464` with:
 scrape_configs:
   - job_name: omp_usage
     static_configs:
-      - targets: ['192.168.188.50:9464']
+      - targets: ['exporter.example.internal:9464']
 ```
 
 ### 4. Import the Grafana dashboard
@@ -88,4 +88,4 @@ Plus operational metrics: import errors, invalid records, last import timestamp.
 
 ## License
 
-[MIT](../LICENSE) © Tommaso Marchionni
+[MIT](https://github.com/tommasomarchionni/omp-usage/blob/main/LICENSE) © Tommaso Marchionni

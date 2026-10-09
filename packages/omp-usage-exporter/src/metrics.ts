@@ -1,4 +1,4 @@
-import client, { Registry, Counter, Gauge } from "prom-client";
+import client, { Registry, Counter, Gauge } from "@prometheus-io/client";
 import type { AggregatedMetrics } from "@tommasomarchionni/omp-usage-protocol";
 
 export function createRegistry(): Registry {
@@ -58,8 +58,8 @@ export function createLlmMetrics(registry: Registry, _maxLabelCardinality: numbe
 export interface OperationalMetrics {
   importErrorsTotal: Counter<string>;
   invalidRecordsTotal: Counter<string>;
-  lastImportTimestamp: Gauge<string>;
-  labelCardinalityGauge: Gauge<string>;
+  lastImportTimestamp: Gauge<never>;
+  labelCardinalityGauge: Gauge<never>;
 }
 
 export function createOperationalMetrics(registry: Registry): OperationalMetrics {

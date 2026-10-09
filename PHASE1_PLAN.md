@@ -82,7 +82,7 @@ omp-usage/
 │       │   ├── server.ts        # HTTP server (/metrics, /healthz)
 │       │   ├── importer.ts      # JSONL → SQLite import
 │       │   ├── database.ts      # SQLite schema, migrations, cursors
-│       │   ├── metrics.ts       # prom-client metrics
+│       │   ├── metrics.ts       # Prometheus metrics client
 │       │   ├── shutdown.ts      # Graceful shutdown
 │       │   └── types.ts
 │       ├── tests/
@@ -169,7 +169,7 @@ omp-usage-exporter --config-check
 | `--log-level` | `OMP_USAGE_LOG_LEVEL` | `info` |
 
 **HTTP Server** (`src/server.ts`):
-- `GET /metrics` — Prometheus metrics (prom-client)
+- `GET /metrics` — Prometheus metrics (client library)
 - `GET /healthz` — `{ status: "ok", lastImport: ISO8601 | null }`
 - No event file exposure
 - Bind 127.0.0.1 default; LAN bind requires explicit config
@@ -243,7 +243,7 @@ omp-usage-exporter --config-check
 | Root | typescript, eslint, prettier, vitest, @types/node, npm-run-all |
 | omp-usage | zod (or arktype), uuid, @oh-my-pi/pi-catalog (types only, peer) |
 | omp-usage-protocol | zod, typescript |
-| omp-usage-exporter | better-sqlite3, prom-client, zod, uuid, commander |
+| omp-usage-exporter | better-sqlite3, @prometheus-io/client, zod, uuid, commander |
 
 **Native deps**: `better-sqlite3` (needs Python + build tools on macOS arm64/Linux)
 
@@ -281,7 +281,7 @@ omp-usage-exporter --config-check
 - [ ] Subagent / direct plugin call coverage
 - [ ] GitHub Copilot / other provider event shapes
 - [ ] npm package name availability (`@tommasomarchionni/omp-usage*`)
-- [ ] Port 9464 availability on target Mac (192.168.188.50)
+- [ ] Port 9464 availability on target host (example: exporter.example.internal)
 - [ ] better-sqlite3 build on macOS arm64 without Xcode CLI tools
 - [ ] Prometheus scrape interval vs `increase()` semantics in practice
 

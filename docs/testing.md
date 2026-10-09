@@ -120,7 +120,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
       - run: npm ci
       - run: npm run build
@@ -258,8 +258,8 @@ npm run test -- --coverage
 Before publishing, verify:
 
 ```bash
-# Dry-run pack
-npm pack --dry-run --workspaces
+# Generate real tarballs for smoke verification
+npm pack --workspaces --ignore-scripts
 
 # Install from tarball
 cd /tmp

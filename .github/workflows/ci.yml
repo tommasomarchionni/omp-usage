@@ -97,17 +97,17 @@ jobs:
       - name: Build
         run: npm run build
       - name: Pack plugin
-        run: npm pack --dry-run --workspaces --ignore-scripts
+        run: npm pack --workspaces --ignore-scripts
       - name: Install plugin tarball
         run: |
           cd packages/omp-usage
-          npm pack --dry-run
+          npm pack
           # Verify package.json exports
           node -e "const pkg = require('./package.json'); console.log('exports:', Object.keys(pkg.exports || {}));"
       - name: Install exporter tarball
         run: |
           cd packages/omp-usage-exporter
-          npm pack --dry-run
+          npm pack
           node -e "const pkg = require('./package.json'); console.log('bin:', pkg.bin); console.log('exports:', Object.keys(pkg.exports || {}));"
 
   docs:

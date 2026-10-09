@@ -83,7 +83,7 @@ omp-usage-exporter --config-check
 omp-usage-exporter --version
 
 # Check dependencies
-node -e "require('better-sqlite3'); require('prom-client'); console.log('OK')"
+node -e "require('better-sqlite3'); require('@prometheus-io/client'); console.log('OK')"
 ```
 
 **Common errors**:

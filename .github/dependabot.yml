@@ -30,7 +30,7 @@ updates:
           - "zod"
           - "uuid"
           - "better-sqlite3"
-          - "prom-client"
+          - "@prometheus-io/client"
           - "commander"
         update-types:
           - "minor"

@@ -5,6 +5,8 @@
 
 OMP usage tracking plugin and Prometheus exporter for [Oh My Pi](https://github.com/can1357/oh-my-pi).
 
+Live documentation: https://tommasomarchionni.github.io/omp-usage/
+
 ## Packages
 
 | Package | Description |
@@ -54,7 +56,7 @@ The exporter starts on `http://127.0.0.1:9464` with:
 scrape_configs:
   - job_name: omp_usage
     static_configs:
-      - targets: ['192.168.188.50:9464']
+      - targets: ['exporter.example.internal:9464']
 ```
 
 ### 4. Import the Grafana dashboard
@@ -77,6 +79,12 @@ See `docs/grafana.md` for the dashboard JSON.
 | Persistence & Recovery | [docs/persistence.md](docs/persistence.md) |
 | Shutdown | [docs/shutdown.md](docs/shutdown.md) |
 | Testing | [docs/testing.md](docs/testing.md) |
+
+## Release and Publishing
+
+- Versioning and release notes are automated with `release-please`.
+- GitHub Releases are created automatically from merged release PRs.
+- npm publishing is automated with npm Trusted Publishing (OIDC), without long-lived npm tokens.
 
 ## Architecture
 

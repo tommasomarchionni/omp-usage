@@ -8,10 +8,10 @@ Add to your `prometheus.yml`:
 scrape_configs:
   - job_name: omp_usage
     static_configs:
-      - targets: ['192.168.188.50:9464']
+      - targets: ['exporter.example.internal:9464']
         labels:
           environment: production
-          host: mac-mini
+          host: exporter-primary
     scrape_interval: 30s
     scrape_timeout: 10s
     metrics_path: /metrics
@@ -23,13 +23,13 @@ scrape_configs:
 scrape_configs:
   - job_name: omp_usage
     static_configs:
-      - targets: ['192.168.188.50:9464']
+      - targets: ['exporter-primary.internal:9464']
         labels:
-          host: mac-mini
+          host: exporter-primary
           role: primary
-      - targets: ['192.168.188.51:9464']
+      - targets: ['exporter-secondary.internal:9464']
         labels:
-          host: mac-studio
+          host: exporter-secondary
           role: secondary
 ```
 
@@ -41,7 +41,7 @@ Add instance/host labels from target:
 scrape_configs:
   - job_name: omp_usage
     static_configs:
-      - targets: ['192.168.188.50:9464']
+      - targets: ['exporter.example.internal:9464']
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance
@@ -134,9 +134,9 @@ Example target file (`targets/omp_usage/mac-mini.json`):
 ```json
 [
   {
-    "targets": ["192.168.188.50:9464"],
+    "targets": ["exporter.example.internal:9464"],
     "labels": {
-      "host": "mac-mini",
+      "host": "exporter-primary",
       "environment": "production"
     }
   }
@@ -160,7 +160,7 @@ remote_write:
 
 Test scrape:
 ```bash
-curl -s http://192.168.188.50:9464/metrics | grep omp_llm
+curl -s http://exporter.example.internal:9464/metrics | grep omp_llm
 ```
 
 Check target status in Prometheus UI:
