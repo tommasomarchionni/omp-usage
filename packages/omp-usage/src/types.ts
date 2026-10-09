@@ -1,0 +1,67 @@
+export interface OmpApi {
+  on(event: "message_end", handler: (event: { message: AssistantMessage }) => void): void;
+  on(event: "shutdown", handler: () => void | Promise<void>): void;
+}
+
+export interface AssistantMessage {
+  role: "assistant";
+  provider: string | null;
+  model: string | null;
+  api: string | null;
+  stopReason: StopReason | null;
+  usage: Usage | null;
+}
+
+export type StopReason = "stop" | "length" | "toolUse" | "error" | "aborted";
+
+export interface Usage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  totalTokens: number;
+  reasoningTokens?: number;
+  cost: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    total: number;
+  };
+}
+
+export interface PluginConfig {
+  eventsDir: string;
+  maxQueueSize: number;
+  flushIntervalMs: number;
+  fileMode: number;
+  dirMode: number;
+}
+
+export const DEFAULT_PLUGIN_CONFIG: PluginConfig = {
+  eventsDir: "",
+  maxQueueSize: 1000,
+  flushIntervalMs: 1000,
+  fileMode: 0o600,
+  dirMode: 0o700,
+};
+
+export interface AssistantMessageEvent {
+  provider: string | null;
+  model: string | null;
+  api: string | null;
+  stopReason: StopReason | null;
+  usage: Usage | null;
+}
+
+export interface WriterConfig {
+  eventsDir: string;
+  maxQueueSize: number;
+  flushIntervalMs: number;
+  fileMode: number;
+  dirMode: number;
+}
+
+export interface PluginCleanup {
+  (): Promise<void>;
+}

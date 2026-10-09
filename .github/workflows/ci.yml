@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Run ESLint
+        run: npm run lint
+
+  typecheck:
+    name: TypeCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Run tests
+        run: npm run test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build all packages
+        run: npm run build
+      - name: Verify dist outputs
+        run: |
+          test -f packages/omp-usage/dist/index.js
+          test -f packages/omp-usage/dist/index.d.ts
+          test -f packages/omp-usage-protocol/dist/index.js
+          test -f packages/omp-usage-protocol/dist/index.d.ts
+          test -f packages/omp-usage-exporter/dist/cli.js
+          test -f packages/omp-usage-exporter/dist/cli.d.ts
+
+  package-smoke:
+    name: Package Smoke Test
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Pack plugin
+        run: npm pack --dry-run --workspaces --ignore-scripts
+      - name: Install plugin tarball
+        run: |
+          cd packages/omp-usage
+          npm pack --dry-run
+          # Verify package.json exports
+          node -e "const pkg = require('./package.json'); console.log('exports:', Object.keys(pkg.exports || {}));"
+      - name: Install exporter tarball
+        run: |
+          cd packages/omp-usage-exporter
+          npm pack --dry-run
+          node -e "const pkg = require('./package.json'); console.log('bin:', pkg.bin); console.log('exports:', Object.keys(pkg.exports || {}));"
+
+  docs:
+    name: Docs Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install mkdocs
+        run: pip install mkdocs-material
+      - name: Build docs
+        run: mkdocs build -f docs/mkdocs.yml --strict
+        # docs/mkdocs.yml will be created in docs phase

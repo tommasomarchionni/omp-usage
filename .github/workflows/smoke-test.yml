@@ -1,0 +1,65 @@
+name: Smoke Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Exporter target (host:port)"
+        required: true
+        default: "192.168.188.50:9464"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check exporter health
+        run: |
+          set -e
+          TARGET="${{ github.event.inputs.target }}"
+          echo "Testing exporter at $TARGET"
+          
+          # Health check
+          curl -sf "http://$TARGET/healthz" | jq -e '.status == "ok"'
+          
+          # Metrics endpoint
+          curl -sf "http://$TARGET/metrics" | grep -q "omp_llm_tokens_total"
+          
+          echo "Smoke test passed"
+      
+      - name: Verify metrics structure
+        run: |
+          set -e
+          TARGET="${{ github.event.inputs.target }}"
+          
+          METRICS=$(curl -sf "http://$TARGET/metrics")
+          
+          # Check required metrics exist
+          echo "$METRICS" | grep -q "omp_llm_tokens_total"
+          echo "$METRICS" | grep -q "omp_llm_reasoning_tokens_total"
+          echo "$METRICS" | grep -q "omp_llm_requests_total"
+          echo "$METRICS" | grep -q "omp_llm_reported_cost_usd_total"
+          echo "$METRICS" | grep -q "omp_llm_usage_missing_total"
+          
+          # Check operational metrics
+          echo "$METRICS" | grep -q "omp_usage_import_errors_total"
+          echo "$METRICS" | grep -q "omp_usage_invalid_records_total"
+          echo "$METRICS" | grep -q "omp_usage_last_import_timestamp"
+          echo "$METRICS" | grep -q "omp_usage_label_cardinality"
+          
+          echo "All required metrics present"
+      
+      - name: Test label cardinality
+        run: |
+          set -e
+          TARGET="${{ github.event.inputs.target }}"
+          
+          CARDINALITY=$(curl -sf "http://$TARGET/metrics" | grep "^omp_usage_label_cardinality" | awk '{print $2}')
+          echo "Current label cardinality: $CARDINALITY"
+          
+          if [ "$CARDINALITY" -gt 900 ]; then
+            echo "WARNING: Label cardinality ($CARDINALITY) approaching limit (1000)"
+          fi
