@@ -1,6 +1,6 @@
 {
   "name": "@tommasomarchionni/omp-usage-exporter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Node.js service that imports OMP usage events and exposes Prometheus metrics",
   "type": "module",
   "license": "MIT",
