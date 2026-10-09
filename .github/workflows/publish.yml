@@ -26,9 +26,28 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
-      - name: Publish plugin package
+      - name: Publish plugin package (OIDC, fallback to NPM_TOKEN)
         working-directory: packages/omp-usage
-        run: npm publish --access public --provenance
+        env:
+          NPM_FALLBACK_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set +e
+          npm publish --access public --provenance
+          publish_exit=$?
+          set -e
+
+          if [ "$publish_exit" -eq 0 ]; then
+            exit 0
+          fi
+
+          if [ -z "${NPM_FALLBACK_TOKEN:-}" ]; then
+            echo "OIDC publish failed and NPM_TOKEN is not configured."
+            exit "$publish_exit"
+          fi
+
+          echo "OIDC publish failed, retrying with NPM_TOKEN fallback."
+          printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_FALLBACK_TOKEN" > "$HOME/.npmrc"
+          npm publish --access public
 
   publish-exporter:
     name: Publish @tommasomarchionni/omp-usage-exporter
@@ -46,6 +65,25 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
-      - name: Publish exporter package
+      - name: Publish exporter package (OIDC, fallback to NPM_TOKEN)
         working-directory: packages/omp-usage-exporter
-        run: npm publish --access public --provenance
+        env:
+          NPM_FALLBACK_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set +e
+          npm publish --access public --provenance
+          publish_exit=$?
+          set -e
+
+          if [ "$publish_exit" -eq 0 ]; then
+            exit 0
+          fi
+
+          if [ -z "${NPM_FALLBACK_TOKEN:-}" ]; then
+            echo "OIDC publish failed and NPM_TOKEN is not configured."
+            exit "$publish_exit"
+          fi
+
+          echo "OIDC publish failed, retrying with NPM_TOKEN fallback."
+          printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_FALLBACK_TOKEN" > "$HOME/.npmrc"
+          npm publish --access public
