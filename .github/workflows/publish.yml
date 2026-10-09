@@ -27,7 +27,8 @@ jobs:
       - name: Build
         run: npm run build
       - name: Publish plugin package
-        run: npm publish --workspace=@tommasomarchionni/omp-usage --access public --provenance
+        working-directory: packages/omp-usage
+        run: npm publish --access public --provenance
 
   publish-exporter:
     name: Publish @tommasomarchionni/omp-usage-exporter
@@ -46,4 +47,5 @@ jobs:
       - name: Build
         run: npm run build
       - name: Publish exporter package
-        run: npm publish --workspace=@tommasomarchionni/omp-usage-exporter --access public --provenance
+        working-directory: packages/omp-usage-exporter
+        run: npm publish --access public --provenance
