@@ -13,7 +13,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 async function getVersion(): Promise<string> {
   try {
     const pkgPath = new URL("../package.json", import.meta.url).pathname;
-    const pkg = await import(pkgPath, { assert: { type: "json" } });
+    const pkg = await import(pkgPath, { with: { type: "json" } });
     return pkg.default.version;
   } catch {
     return "0.0.0";

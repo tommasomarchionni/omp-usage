@@ -4,6 +4,7 @@ import {
   UsageEventInput,
   SCHEMA_VERSION,
 } from "./schema.js";
+import { randomUUID } from "crypto";
 export interface ValidationResult {
   valid: boolean;
   event?: UsageEvent;
@@ -77,8 +78,8 @@ export function createEvent(input: UsageEventInput): UsageEvent {
   const now = new Date().toISOString();
   return {
     schemaVersion: SCHEMA_VERSION,
-    eventId: crypto.randomUUID(),
-    sessionRunId: crypto.randomUUID(),
+    eventId: randomUUID(),
+    sessionRunId: randomUUID(),
     timestamp: input.timestamp ?? now,
     eventType: input.eventType,
     provider: input.provider,
