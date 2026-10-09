@@ -1,1 +1,37 @@
-{"name":"@tommasomarchionni/omp-usage-protocol","version":"0.1.0","private":true,"description":"Internal protocol schema for omp-usage events","type":"module","main":"./dist/index.js","types":"./dist/index.d.ts","exports":{"./package.json":"./package.json",".":{"types":"./dist/index.d.ts","import":"./dist/index.js","default":"./dist/index.js"}},"scripts":{"build":"tsc -p tsconfig.json","test":"vitest run --pool=threads --maxWorkers=1 --minWorkers=1","lint":"eslint src --ext .ts","typecheck":"tsc --noEmit"},"dependencies":{"zod":"^4.6.5"},"devDependencies":{"typescript":"^5.5.0","vitest":"^2.0.0","@types/node":"^20.14.0"},"publishConfig":{"access":"restricted"},"files":["dist"]}
+{
+  "name": "@tommasomarchionni/omp-usage-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Internal protocol schema for omp-usage events",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --pool=threads --maxWorkers=1 --minWorkers=1",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0",
+    "@types/node": "^26.6.4"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "files": [
+    "dist"
+  ]
+}
