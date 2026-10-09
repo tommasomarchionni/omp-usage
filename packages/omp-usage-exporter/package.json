@@ -34,7 +34,7 @@
     "@prometheus-io/client": "^0.16.1",
     "better-sqlite3": "^13.0.0",
     "commander": "^15.0.0",
-    "uuid": "^11.0.0"
+    "uuid": "^14.0.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
