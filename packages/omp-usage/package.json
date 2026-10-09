@@ -21,7 +21,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run --pool=threads --maxWorkers=1 --minWorkers=1",
+    "test": "vitest run --pool=threads --maxWorkers=1",
     "lint": "eslint src --ext .ts",
     "typecheck": "npm run build --workspace=@tommasomarchionni/omp-usage-protocol && tsc --noEmit"
   },
@@ -31,7 +31,7 @@
   "devDependencies": {
     "@types/node": "^26.6.4",
     "typescript": "^6.0.3",
-    "vitest": "^2.0.0"
+    "vitest": "^5.0.3"
   },
   "omp": {
     "extensions": [
