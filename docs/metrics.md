@@ -59,6 +59,10 @@ At most `--max-label-cardinality` (default 1000) distinct `(provider, model)` pa
 
 `omp_usage_last_import_timestamp` (without `_seconds`) from 0.2.x was renamed.
 
+## Price metrics
+
+Exported only with `--pricing-file`: `omp_llm_price_usd_per_million_tokens`, `omp_llm_reference_price_usd_per_million_tokens`, `omp_llm_pricing_info` and `omp_usage_pricing_*`. See [Pricing & Equivalent Cost](pricing.md).
+
 ## PromQL examples
 
 ```promql

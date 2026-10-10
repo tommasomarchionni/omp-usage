@@ -67,6 +67,7 @@ Flags take precedence over environment variables, which take precedence over def
 | `--shutdown-timeout-ms`   | `OMP_USAGE_SHUTDOWN_TIMEOUT_MS`     | `10000`                                | Graceful shutdown budget before exiting with code 1                                                              |
 | `--no-watch`              |                                     | watcher on                             | Disable `fs.watch` and rely on polling                                                                           |
 | `--retention-days`        | `OMP_USAGE_EXPORTER_RETENTION_DAYS` | off                                    | Delete event files that are **fully imported** and unmodified for N days (checked hourly). Events stay in SQLite |
+| `--pricing-file`          | `OMP_USAGE_PRICING_FILE`            | none                                   | JSON price tables for equivalent-cost dashboards, see [Pricing](pricing.md)                                      |
 
 ## Configuration Examples
 

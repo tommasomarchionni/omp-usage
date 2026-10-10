@@ -21,6 +21,10 @@ export interface ResolvedConfig {
   staleAfterMs: number;
   /** Delete fully imported files idle for this many days; null = never. */
   retentionDays: number | null;
+  /** Optional JSON price tables for equivalent-cost dashboards; null = disabled. */
+  pricingFile: string | null;
+  /** Default location of the cached OpenRouter catalog. */
+  pricingCacheFile: string;
 }
 
 export const DEFAULTS = {
@@ -42,6 +46,7 @@ export interface ConfigFlags {
   pollIntervalMs?: number | string;
   shutdownTimeoutMs?: number | string;
   retentionDays?: number | string;
+  pricingFile?: string;
 }
 
 export class ConfigError extends Error {
@@ -137,6 +142,10 @@ export function resolveConfig(
     retentionDays: parseRetention(
       pick(flags.retentionDays, 'OMP_USAGE_EXPORTER_RETENTION_DAYS', env)
     ),
+    pricingFile: ((v?: string) => (v ? expandPath(v) : null))(
+      pick(flags.pricingFile, 'OMP_USAGE_PRICING_FILE', env)
+    ),
+    pricingCacheFile: join(stateDir, 'openrouter-models.json'),
   };
   validateConfig(config);
   return config;

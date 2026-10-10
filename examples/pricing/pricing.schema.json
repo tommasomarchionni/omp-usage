@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "openrouter": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Download public prices from the OpenRouter catalog (one GET, no usage data sent)"
+        },
+        "refreshHours": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 720
+        },
+        "cacheFile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "autoMap": {
+          "description": "Price provider \"openrouter\" models from the catalog without a mapping (default true)",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "models": {
+      "maxItems": 10000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Provider exactly as in the provider label of omp_llm_tokens_total"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "Model exactly as in the model label of omp_llm_tokens_total"
+          },
+          "openrouter": {
+            "description": "OpenRouter model id to take prices from, e.g. qwen/qwen3.6-35b-a3b",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "prices": {
+            "description": "Explicit prices in USD per 1M tokens; override the catalog per direction",
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000,
+                "description": "USD per 1M tokens"
+              },
+              "output": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000,
+                "description": "USD per 1M tokens"
+              },
+              "cacheRead": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000,
+                "description": "USD per 1M tokens"
+              },
+              "cacheWrite": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000,
+                "description": "USD per 1M tokens"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "provider",
+          "model"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "references": {
+      "description": "Models to compare the whole usage against: OpenRouter ids or {name, prices}",
+      "maxItems": 100,
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "openrouter": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "prices": {
+                "type": "object",
+                "properties": {
+                  "input": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "description": "USD per 1M tokens"
+                  },
+                  "output": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "description": "USD per 1M tokens"
+                  },
+                  "cacheRead": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "description": "USD per 1M tokens"
+                  },
+                  "cacheWrite": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "description": "USD per 1M tokens"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$id": "https://raw.githubusercontent.com/tommasomarchionni/omp-usage/main/examples/pricing/pricing.schema.json",
+  "title": "omp-usage-exporter pricing file"
+}

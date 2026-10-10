@@ -47,6 +47,7 @@ nav:
   - Plugin: plugin.md
   - Exporter: exporter.md
   - Metrics: metrics.md
+  - Pricing & Equivalent Cost: pricing.md
   - Prometheus: prometheus.md
   - Grafana: grafana.md
   - launchd (macOS): launchd.md

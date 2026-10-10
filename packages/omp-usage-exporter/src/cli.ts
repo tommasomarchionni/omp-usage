@@ -4,6 +4,7 @@ import { ConfigError, resolveConfig, type ConfigFlags } from './config.js';
 import { createApp } from './app.js';
 import { DatabaseLockedError, ExporterDatabase } from './database.js';
 import { createLogger } from './logger.js';
+import { PricingConfigError, PricingService } from './pricing.js';
 import { VERSION } from './version.js';
 
 export async function main(argv: string[] = process.argv): Promise<number> {
@@ -48,6 +49,14 @@ export async function main(argv: string[] = process.argv): Promise<number> {
       '--retention-days <days>',
       'delete fully imported event files idle for N days (default: never) [env OMP_USAGE_EXPORTER_RETENTION_DAYS]'
     )
+    .option(
+      '--pricing-file <path>',
+      'JSON price tables for equivalent-cost dashboards (default: none) [env OMP_USAGE_PRICING_FILE]'
+    )
+    .option(
+      '--print-prices',
+      'resolve the pricing file (downloads the OpenRouter catalog if enabled), print the prices as JSON and exit'
+    )
     .option('--no-watch', 'disable fs.watch and rely on polling only (network filesystems)')
     .option('--config-check', 'validate configuration, print it as JSON and exit')
     .option('--import-once', 'run a single import cycle and exit')
@@ -74,6 +83,8 @@ export async function main(argv: string[] = process.argv): Promise<number> {
     pollIntervalMs?: string;
     shutdownTimeoutMs?: string;
     retentionDays?: string;
+    pricingFile?: string;
+    printPrices?: boolean;
     watch: boolean;
     configCheck?: boolean;
     importOnce?: boolean;
@@ -93,6 +104,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
       pollIntervalMs: opts.pollIntervalMs,
       shutdownTimeoutMs: opts.shutdownTimeoutMs,
       retentionDays: opts.retentionDays,
+      pricingFile: opts.pricingFile,
     };
     config = resolveConfig(flags);
   } catch (e) {
@@ -109,6 +121,66 @@ export async function main(argv: string[] = process.argv): Promise<number> {
   }
 
   const logger = createLogger(config.logLevel);
+
+  if (opts.printPrices) {
+    if (!config.pricingFile) {
+      process.stderr.write('Configuration error: --print-prices requires --pricing-file\n');
+      return 2;
+    }
+    try {
+      const pricing = new PricingService({
+        file: config.pricingFile,
+        logger,
+        defaultCacheFile: config.pricingCacheFile,
+        userAgent: `omp-usage-exporter/${VERSION}`,
+      });
+      await pricing.tick();
+      // Include provider/model pairs already in the database (lock-free read).
+      let pairs: Array<{ provider: string; model: string }> = [];
+      try {
+        const db = new ExporterDatabase(config.dbPath, { lock: false });
+        try {
+          pairs = db.getAggregates();
+        } finally {
+          db.close();
+        }
+      } catch {
+        // no database yet
+      }
+      const snap = pricing.snapshot(pairs);
+      process.stdout.write(
+        JSON.stringify(
+          {
+            catalog: pricing.openrouter
+              ? {
+                  url: pricing.openrouter.url,
+                  models: pricing.openrouter.size,
+                  updatedAt: pricing.openrouter.updatedAt
+                    ? new Date(pricing.openrouter.updatedAt).toISOString()
+                    : null,
+                  lastError: pricing.openrouter.lastError,
+                }
+              : null,
+            ...snap,
+            unpricedPairs: pairs
+              .filter(
+                p => !snap.mappings.some(m => m.provider === p.provider && m.model === p.model)
+              )
+              .map(p => ({ provider: p.provider, model: p.model })),
+          },
+          null,
+          2
+        ) + '\n'
+      );
+      return snap.unresolved.length === 0 ? 0 : 3;
+    } catch (e) {
+      if (e instanceof PricingConfigError) {
+        process.stderr.write(`Configuration error: ${e.message}\n`);
+        return 2;
+      }
+      throw e;
+    }
+  }
 
   if (opts.rebuildAggregates) {
     const db = openOrExplain(config.dbPath, logger);
@@ -141,6 +213,10 @@ export async function main(argv: string[] = process.argv): Promise<number> {
     if (e instanceof DatabaseLockedError) {
       logger.error(e.message);
       return 1;
+    }
+    if (e instanceof PricingConfigError) {
+      process.stderr.write(`Configuration error: ${e.message}\n`);
+      return 2;
     }
     throw e;
   }
@@ -193,6 +269,8 @@ export async function main(argv: string[] = process.argv): Promise<number> {
   // Initial import happens after the listener is up so /healthz answers
   // during a long first import; Prometheus sees the counters grow.
   await app.scheduler.start();
+  // Catalog download runs in the background; never delays imports.
+  void app.pricing?.start();
   return -1; // keep running; exit is driven by signals
 }
 

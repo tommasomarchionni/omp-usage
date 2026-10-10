@@ -10,6 +10,7 @@ import {
   type ExporterMetrics,
   type ExporterState,
 } from './metrics.js';
+import { PricingService } from './pricing.js';
 import { ImportScheduler } from './scheduler.js';
 import { ExporterServer } from './server.js';
 import { ShutdownManager } from './shutdown.js';
@@ -22,6 +23,7 @@ export interface ExporterApp {
   metrics: ExporterMetrics;
   state: ExporterState;
   shutdown: ShutdownManager;
+  pricing: PricingService | null;
 }
 
 export interface CreateAppOptions {
@@ -30,6 +32,8 @@ export interface CreateAppOptions {
   /** Disable fs.watch (tests, network filesystems). */
   watch?: boolean;
   collectProcessMetrics?: boolean;
+  /** Injected for tests. */
+  fetch?: typeof fetch;
 }
 
 /** Wires all components. Opening the database acquires the exclusive lock. */
@@ -37,12 +41,24 @@ export function createApp(config: ResolvedConfig, options: CreateAppOptions): Ex
   const { logger } = options;
   mkdirSync(config.eventsDir, { recursive: true, mode: 0o700 });
 
+  // Validate the pricing file before taking the database lock (fail fast).
+  const pricing = config.pricingFile
+    ? new PricingService({
+        file: config.pricingFile,
+        logger,
+        defaultCacheFile: config.pricingCacheFile,
+        userAgent: `omp-usage-exporter/${options.version}`,
+        fetch: options.fetch,
+      })
+    : null;
+
   const db = new ExporterDatabase(config.dbPath);
   const state = createExporterState();
   const metrics = createMetrics(db, state, {
     maxLabelCardinality: config.maxLabelCardinality,
     version: options.version,
     collectProcessMetrics: options.collectProcessMetrics,
+    pricing,
   });
 
   const importer = new Importer(
@@ -82,6 +98,7 @@ export function createApp(config: ResolvedConfig, options: CreateAppOptions): Ex
   const shutdown = new ShutdownManager(
     [
       { name: 'http', stop: () => server.stop(Math.min(5_000, config.shutdownTimeoutMs / 2)) },
+      { name: 'pricing', stop: () => pricing?.stop() },
       { name: 'importer', stop: () => scheduler.stop() },
       { name: 'database', stop: () => db.close() },
     ],
@@ -96,5 +113,5 @@ export function createApp(config: ResolvedConfig, options: CreateAppOptions): Ex
     });
   }
 
-  return { db, importer, scheduler, server, metrics, state, shutdown };
+  return { db, importer, scheduler, server, metrics, state, shutdown, pricing };
 }

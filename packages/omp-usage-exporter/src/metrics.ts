@@ -1,5 +1,6 @@
 import client, { Counter, Gauge, Registry } from '@prometheus-io/client';
 import type { ExporterDatabase } from './database.js';
+import type { PricingService, PricingSnapshot } from './pricing.js';
 import type { AggregatedMetrics } from './protocol.js';
 
 /** Label value used when the (provider, model) cardinality limit is exceeded. */
@@ -79,6 +80,8 @@ export interface MetricsOptions {
   version: string;
   /** Collect Node.js process metrics (prefixed `omp_usage_`). */
   collectProcessMetrics?: boolean;
+  /** Optional price tables (--pricing-file). */
+  pricing?: PricingService | null;
 }
 
 export interface ExporterMetrics {
@@ -217,6 +220,124 @@ export function createMetrics(
       for (const a of getSnapshot().aggs) this.inc(labelsFor(a.provider, a.model), a.costMissing);
     },
   });
+
+  // ------------------------------------------------------------ pricing --
+  // Prices are exported as gauges; equivalent costs are computed in PromQL
+  // (tokens × price / 1e6) so they follow the selected time range and are
+  // never mixed with the reported cost.
+  const pricing = options.pricing ?? null;
+  let pricingSnap: PricingSnapshot | null = null;
+  const getPricing = (): PricingSnapshot | null => {
+    if (!pricing) return null;
+    pricingSnap ??= pricing.snapshot(getSnapshot().aggs);
+    return pricingSnap;
+  };
+  /** Same label values as the token counters, so `on(provider, model)` joins match. */
+  const priceLabels = (provider: string, model: string) => {
+    const l = getSnapshot().labels.map.get(pairKey(provider, model));
+    return l && l.provider !== OVERFLOW_LABEL
+      ? l
+      : { provider: normalizeLabelValue(provider), model: normalizeLabelValue(model) };
+  };
+
+  if (pricing) {
+    new Gauge({
+      name: 'omp_llm_price_usd_per_million_tokens',
+      help: 'Configured price in USD per 1M tokens, by provider, model and direction (source: file or openrouter). Use for equivalent cost: tokens * price / 1e6',
+      labelNames: ['provider', 'model', 'direction', 'source'],
+      registers: [registry],
+      collect() {
+        this.reset();
+        pricingSnap = null; // one resolution per scrape
+        for (const p of getPricing()?.prices ?? [])
+          this.set(
+            { ...priceLabels(p.provider, p.model), direction: p.direction, source: p.source },
+            p.usdPerMillion
+          );
+      },
+    });
+
+    new Gauge({
+      name: 'omp_llm_reference_price_usd_per_million_tokens',
+      help: 'Price of a reference model in USD per 1M tokens, to compare the whole usage against it',
+      labelNames: ['reference_model', 'direction', 'source'],
+      registers: [registry],
+      collect() {
+        this.reset();
+        for (const r of getPricing()?.references ?? [])
+          this.set(
+            {
+              reference_model: normalizeLabelValue(r.name),
+              direction: r.direction,
+              source: r.source,
+            },
+            r.usdPerMillion
+          );
+      },
+    });
+
+    new Gauge({
+      name: 'omp_llm_pricing_info',
+      help: 'Price mapping per provider/model (openrouter_id is empty for explicit prices); value is the number of priced directions',
+      labelNames: ['provider', 'model', 'openrouter_id', 'mapping'],
+      registers: [registry],
+      collect() {
+        this.reset();
+        for (const m of getPricing()?.mappings ?? [])
+          this.set(
+            {
+              ...priceLabels(m.provider, m.model),
+              openrouter_id: normalizeLabelValue(m.openrouterId ?? ''),
+              mapping: m.mapping,
+            },
+            m.directions.length
+          );
+      },
+    });
+
+    new Gauge({
+      name: 'omp_usage_pricing_unresolved',
+      help: 'Configured models or references without any price (unknown OpenRouter id or catalog not loaded)',
+      labelNames: ['kind', 'name'],
+      registers: [registry],
+      collect() {
+        this.reset();
+        for (const u of getPricing()?.unresolved ?? [])
+          this.set({ kind: u.kind, name: normalizeLabelValue(u.name) }, 1);
+      },
+    });
+
+    new Gauge({
+      name: 'omp_usage_pricing_catalog_models',
+      help: 'Models with prices in the OpenRouter catalog (0 when disabled or not loaded)',
+      registers: [registry],
+      collect() {
+        this.set(pricing.openrouter?.size ?? 0);
+      },
+    });
+
+    new Gauge({
+      name: 'omp_usage_pricing_catalog_updated_timestamp_seconds',
+      help: 'Unix time of the last successful OpenRouter catalog download',
+      registers: [registry],
+      collect() {
+        const t = pricing.openrouter?.updatedAt;
+        if (t) this.set(t / 1000);
+      },
+    });
+
+    new Counter({
+      name: 'omp_usage_pricing_errors_total',
+      help: 'Failed catalog refreshes and rejected pricing file reloads since process start',
+      labelNames: ['kind'],
+      registers: [registry],
+      collect() {
+        this.reset();
+        this.inc({ kind: 'catalog_refresh' }, pricing.openrouter?.refreshErrors ?? 0);
+        this.inc({ kind: 'file_reload' }, pricing.reloadErrors);
+      },
+    });
+  }
 
   // ------------------------------------------------------- operational --
 

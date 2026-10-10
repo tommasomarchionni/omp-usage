@@ -23,6 +23,9 @@ omp-usage-exporter [options]
   --max-label-cardinality <n>    maximum exported (provider, model) pairs [env OMP_USAGE_MAX_LABEL_CARDINALITY]
   --poll-interval-ms <ms>        interval between import cycles [env OMP_USAGE_POLL_INTERVAL_MS]
   --shutdown-timeout-ms <ms>     graceful shutdown budget [env OMP_USAGE_SHUTDOWN_TIMEOUT_MS]
+  --retention-days <days>        delete fully imported, idle event files [env OMP_USAGE_EXPORTER_RETENTION_DAYS]
+  --pricing-file <path>          price tables for equivalent cost [env OMP_USAGE_PRICING_FILE]
+  --print-prices                 resolve the pricing file, print prices as JSON and exit
   --no-watch                     polling only (network filesystems)
   --config-check                 validate configuration, print it as JSON and exit
   --import-once                  run a single import cycle and exit
@@ -32,7 +35,7 @@ omp-usage-exporter [options]
   -h, --help                     show help
 ```
 
-Exit codes: `0` success, `1` runtime failure (locked database, listen error, import errors with `--import-once`, shutdown timeout), `2` invalid configuration or arguments.
+Exit codes: `0` success, `1` runtime failure (locked database, listen error, import errors with `--import-once`, shutdown timeout), `2` invalid configuration, arguments or pricing file, `3` (`--print-prices`) a configured price could not be resolved.
 
 ## Import guarantees
 
