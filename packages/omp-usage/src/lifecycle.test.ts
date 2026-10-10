@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { initializePlugin } from './lifecycle.js';
@@ -45,7 +45,7 @@ const msg = (over: Record<string, unknown> = {}) => ({
 describe('initializePlugin', () => {
   let dir: string;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'omp-usage-life-'));
+    dir = realpathSync(mkdtempSync(join(tmpdir(), 'omp-usage-life-')));
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 

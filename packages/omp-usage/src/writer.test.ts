@@ -3,6 +3,7 @@ import {
   chmodSync,
   existsSync,
   mkdtempSync,
+  realpathSync,
   readFileSync,
   rmSync,
   statSync,
@@ -36,7 +37,7 @@ describe('EventWriter', () => {
   let writer: EventWriter;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'omp-usage-writer-'));
+    dir = realpathSync(mkdtempSync(join(tmpdir(), 'omp-usage-writer-')));
     config = { ...DEFAULT_PLUGIN_CONFIG, eventsDir: join(dir, 'events'), flushIntervalMs: 20 };
     writer = new EventWriter(randomUUID(), config);
   });
