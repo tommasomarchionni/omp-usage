@@ -2,6 +2,7 @@
   "name": "@tommasomarchionni/omp-usage",
   "version": "0.2.3",
   "description": "OMP plugin for collecting LLM usage events",
+  "type": "module",
   "license": "MIT",
   "author": "Tommaso Marchionni",
   "repository": {
@@ -21,7 +22,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run --pool=threads --maxWorkers=1",
+    "test": "npm run build && vitest run --pool=threads --maxWorkers=1",
     "lint": "eslint src --ext .ts",
     "typecheck": "npm run build --workspace=@tommasomarchionni/omp-usage-protocol && tsc --noEmit"
   },
