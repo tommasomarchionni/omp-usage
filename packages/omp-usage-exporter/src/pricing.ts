@@ -13,7 +13,17 @@
  * Router aliases such as `openrouter/free` are never resolved to the model
  * that actually served the request.
  */
-import { lstatSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname } from 'node:path';
 import { z } from 'zod';
 import { expandPath } from './config.js';
@@ -240,6 +250,29 @@ export interface CatalogOptions {
  * user enabled it, is a single unauthenticated GET, and sends no usage data.
  * A failed refresh keeps the previous prices.
  */
+/**
+ * Opens a file once and checks type and size on the same descriptor, so the
+ * file cannot be swapped between the check and the read. With `noFollow`, a
+ * symlink is refused (O_NOFOLLOW). Returns an error message instead of
+ * throwing for "not a regular file" and "too large".
+ */
+export function readRegularFile(
+  path: string,
+  maxBytes: number,
+  noFollow: boolean
+): { text: string; mtimeMs: number } | string {
+  const flags = constants.O_RDONLY | (noFollow ? constants.O_NOFOLLOW : 0);
+  const fd = openSync(path, flags);
+  try {
+    const st = fstatSync(fd);
+    if (!st.isFile()) return 'not a regular file';
+    if (st.size > maxBytes) return 'file too large';
+    return { text: readFileSync(fd, 'utf8'), mtimeMs: st.mtimeMs };
+  } finally {
+    closeSync(fd);
+  }
+}
+
 export class OpenRouterCatalog {
   readonly url: string;
   private models = new Map<string, PriceTable>();
@@ -276,9 +309,9 @@ export class OpenRouterCatalog {
   /** Loads the disk cache, if present and for the same URL. */
   loadCache(): boolean {
     try {
-      const st = lstatSync(this.opts.cacheFile);
-      if (!st.isFile() || st.size > MAX_CATALOG_BYTES) return false;
-      const c = JSON.parse(readFileSync(this.opts.cacheFile, 'utf8')) as CatalogCache;
+      const read = readRegularFile(this.opts.cacheFile, MAX_CATALOG_BYTES, true);
+      if (typeof read === 'string') return false;
+      const c = JSON.parse(read.text) as CatalogCache;
       if (c.version !== 1 || c.url !== this.url || !Array.isArray(c.models)) return false;
       const models = new Map<string, PriceTable>();
       for (const m of c.models) {
@@ -554,11 +587,10 @@ export class PricingService {
     const path = this.opts.file;
     let text: string;
     try {
-      const st = statSync(path);
-      if (!st.isFile()) throw new PricingConfigError(`${path}: not a regular file`);
-      if (st.size > 4 * 1024 * 1024) throw new PricingConfigError(`${path}: file too large`);
-      this.mtimeMs = st.mtimeMs;
-      text = readFileSync(path, 'utf8');
+      const read = readRegularFile(path, 4 * 1024 * 1024, false);
+      if (typeof read === 'string') throw new PricingConfigError(`${path}: ${read}`);
+      this.mtimeMs = read.mtimeMs;
+      text = read.text;
     } catch (err) {
       if (err instanceof PricingConfigError) throw err;
       throw new PricingConfigError(`${path}: ${(err as Error).message}`);
