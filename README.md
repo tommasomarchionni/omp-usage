@@ -18,7 +18,26 @@ Live documentation: https://tommasomarchionni.github.io/omp-usage/
 
 ### 1. Install the plugin
 
-Add to your OMP configuration:
+Install with OMP CLI:
+
+```bash
+omp plugin install @tommasomarchionni/omp-usage --scope=user
+omp plugin list
+```
+
+Uninstall when needed:
+
+```bash
+omp plugin uninstall @tommasomarchionni/omp-usage --scope=user
+```
+
+Project-scoped install (writes into the current project plugin scope):
+
+```bash
+omp plugin install @tommasomarchionni/omp-usage --scope=project
+```
+
+If you prefer manual configuration, add to your OMP config:
 
 ```json
 {
@@ -44,6 +63,14 @@ Or for local development:
 npx @tommasomarchionni/omp-usage-exporter
 # or locally
 npm run build && node packages/omp-usage-exporter/dist/cli.js
+```
+
+Global install/uninstall example:
+
+```bash
+npm install -g @tommasomarchionni/omp-usage-exporter
+omp-usage-exporter
+npm uninstall -g @tommasomarchionni/omp-usage-exporter
 ```
 
 The exporter starts on `http://127.0.0.1:9464` with:
@@ -84,7 +111,7 @@ See `docs/grafana.md` for the dashboard JSON.
 
 - Versioning and release notes are automated with `release-please`.
 - GitHub Releases are created automatically from merged release PRs.
-- npm publishing is automated with npm Trusted Publishing (OIDC), without long-lived npm tokens.
+- npm publishing uses npm Trusted Publishing (OIDC) first, with `NPM_TOKEN` fallback configured in CI.
 
 ## Architecture
 

@@ -35,7 +35,14 @@ This project provides two npm packages:
 
 ### 1. Install the plugin
 
-Add to your OMP configuration:
+Install with OMP CLI:
+
+```bash
+omp plugin install @tommasomarchionni/omp-usage --scope=user
+omp plugin list
+```
+
+Then ensure your OMP configuration includes:
 
 ```json
 {
