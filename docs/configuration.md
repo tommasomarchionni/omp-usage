@@ -7,9 +7,9 @@ All configuration is done via environment variables or CLI flags. CLI flags take
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
 | `OMP_USAGE_EVENTS_DIR` | `~/.local/state/omp-usage/events` | Directory where event JSONL files are written |
-| `OMP_USAGE_MAX_QUEUE_SIZE` | `1000` | Maximum in-memory events before new events are dropped |
-| `OMP_USAGE_FLUSH_INTERVAL_MS` | `1000` | Flush cadence to append queued events to JSONL |
-| `OMP_USAGE_RETENTION_DAYS` | `30` | Retention period for `.jsonl` files; set `off` or `0` to disable |
+| `OMP_USAGE_MAX_QUEUE_SIZE` | `1000` | Maximum pending events (only grows while writes fail) before new events are dropped |
+| `OMP_USAGE_FLUSH_INTERVAL_MS` | `1000` | Retry interval after a failed write (successful writes are immediate) |
+| `OMP_USAGE_RETENTION_DAYS` | `off` | Opt-in deletion of `.jsonl` files older than N days. Prefer the exporter's `--retention-days`, which deletes only fully imported files |
 
 Example:
 ```bash
@@ -64,6 +64,7 @@ Flags take precedence over environment variables, which take precedence over def
 | `--poll-interval-ms` | `OMP_USAGE_POLL_INTERVAL_MS` | `5000` | Interval between import cycles (minimum 100) |
 | `--shutdown-timeout-ms` | `OMP_USAGE_SHUTDOWN_TIMEOUT_MS` | `10000` | Graceful shutdown budget before exiting with code 1 |
 | `--no-watch` | | watcher on | Disable `fs.watch` and rely on polling |
+| `--retention-days` | `OMP_USAGE_EXPORTER_RETENTION_DAYS` | off | Delete event files that are **fully imported** and unmodified for N days (checked hourly). Events stay in SQLite |
 
 ## Configuration Examples
 

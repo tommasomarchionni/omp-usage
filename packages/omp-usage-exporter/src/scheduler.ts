@@ -11,6 +11,10 @@ export interface SchedulerOptions {
   watchDebounceMs?: number;
   /** Disable fs.watch (polling only), e.g. on network filesystems. */
   watch?: boolean;
+  /** Delete fully imported, idle files after N days (null = never). */
+  retentionDays?: number | null;
+  /** Minimum interval between retention passes. */
+  retentionIntervalMs?: number;
 }
 
 /**
@@ -29,6 +33,7 @@ export class ImportScheduler {
   private running: Promise<void> | null = null;
   private rerun = false;
   private stopped = false;
+  private lastPruneMs = 0;
 
   constructor(
     private readonly importer: Importer,
@@ -101,6 +106,7 @@ export class ImportScheduler {
           this.state.lastCycleOk = false;
           this.state.lastError = `${result.fileErrors} file(s) failed to import`;
         }
+        this.maybePrune();
         if (result.imported > 0 || result.invalid > 0 || result.resets > 0) {
           this.logger.info('import cycle', {
             imported: result.imported,
@@ -129,6 +135,19 @@ export class ImportScheduler {
       }
     });
     return this.running.then(() => result);
+  }
+
+  private maybePrune(): void {
+    const days = this.options.retentionDays;
+    if (!days || this.stopped || this.db.isClosed()) return;
+    const now = Date.now();
+    if (now - this.lastPruneMs < (this.options.retentionIntervalMs ?? 60 * 60 * 1000)) return;
+    this.lastPruneMs = now;
+    const deleted = this.importer.pruneImported(days, now);
+    if (deleted.length > 0) {
+      this.metrics.filesDeletedTotal.inc(deleted.length);
+      this.logger.info('retention: deleted fully imported files', { count: deleted.length, days });
+    }
   }
 
   /** Stops timers and the watcher, then waits for the in-flight cycle. */

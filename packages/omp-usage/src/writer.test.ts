@@ -1,217 +1,184 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { EventWriter, resolveEventsDir, createPluginConfig } from "./writer.js";
-import type { UsageEvent } from "./types.js";
-import { rmSync, mkdirSync, existsSync, readFileSync, statSync, writeFileSync, utimesSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { randomUUID } from "node:crypto";
-describe("resolveEventsDir", () => {
-  it("returns default path when empty", () => {
-    const result = resolveEventsDir("");
-    expect(result).toContain(".local/state/omp-usage/events");
-  });
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  unlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { EventWriter, createPluginConfig, parseRetentionDays, resolveEventsDir } from './writer.js';
+import { createUsageEvent, extractAssistantMessageData } from './events.js';
+import { DEFAULT_PLUGIN_CONFIG, type PluginConfig, type UsageEvent } from './types.js';
 
-  it("expands tilde", () => {
-    const result = resolveEventsDir("~/custom/path");
-    expect(result).toContain("custom/path");
-    expect(result).not.toContain("~");
-  });
+const event = (): UsageEvent =>
+  createUsageEvent(
+    'run',
+    extractAssistantMessageData({
+      role: 'assistant',
+      provider: 'p',
+      model: 'm',
+      usage: { input: 1 },
+    })!
+  );
+const tick = () => new Promise(r => setImmediate(r));
 
-  it("returns absolute path for relative", () => {
-    const result = resolveEventsDir("relative/path");
-    expect(result).toContain("relative/path");
-  });
-});
-
-describe("createPluginConfig", () => {
-  it("returns defaults with resolved eventsDir", () => {
-    const config = createPluginConfig({});
-    expect(config.eventsDir).toContain(".local/state/omp-usage/events");
-    expect(config.maxQueueSize).toBe(1000);
-    expect(config.flushIntervalMs).toBe(1000);
-    expect(config.fileMode).toBe(0o600);
-    expect(config.dirMode).toBe(0o700);
-    expect(config.retentionDays).toBe(30);
-  });
-
-  it("overrides provided values", () => {
-    const config = createPluginConfig({ maxQueueSize: 500, flushIntervalMs: 500, retentionDays: 7 });
-    expect(config.maxQueueSize).toBe(500);
-    expect(config.flushIntervalMs).toBe(500);
-    expect(config.retentionDays).toBe(7);
-  });
-
-  it("reads env configuration", () => {
-    process.env.OMP_USAGE_EVENTS_DIR = "/tmp/omp-usage-env";
-    process.env.OMP_USAGE_MAX_QUEUE_SIZE = "42";
-    process.env.OMP_USAGE_FLUSH_INTERVAL_MS = "2500";
-    process.env.OMP_USAGE_RETENTION_DAYS = "14";
-
-    const config = createPluginConfig({});
-    expect(config.eventsDir).toContain("/tmp/omp-usage-env");
-    expect(config.maxQueueSize).toBe(42);
-    expect(config.flushIntervalMs).toBe(2500);
-    expect(config.retentionDays).toBe(14);
-
-    delete process.env.OMP_USAGE_EVENTS_DIR;
-    delete process.env.OMP_USAGE_MAX_QUEUE_SIZE;
-    delete process.env.OMP_USAGE_FLUSH_INTERVAL_MS;
-    delete process.env.OMP_USAGE_RETENTION_DAYS;
-  });
-
-  it("supports turning retention off from env", () => {
-    process.env.OMP_USAGE_RETENTION_DAYS = "off";
-    const config = createPluginConfig({});
-    expect(config.retentionDays).toBeNull();
-    delete process.env.OMP_USAGE_RETENTION_DAYS;
-  });
-});
-
-describe("EventWriter", () => {
-  const testDir = join(tmpdir(), `omp-usage-test-${Date.now()}`);
+describe('EventWriter', () => {
+  let dir: string;
+  let config: PluginConfig;
   let writer: EventWriter;
-  const sessionRunId = "550e8400-e29b-41d4-a716-446655440000";
-
-  const createTestEvent = (overrides: Partial<UsageEvent> = {}): UsageEvent => {
-    const base: UsageEvent = {
-      schemaVersion: 1,
-      eventId: randomUUID(),
-      sessionRunId,
-      timestamp: new Date().toISOString(),
-      eventType: "assistant_message_end",
-      provider: "openrouter",
-      model: "openrouter/free",
-      api: "openrouter",
-      stopReason: "stop",
-      usage: {
-        input: 100,
-        output: 50,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 150,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-      },
-    };
-    return { ...base, ...overrides, sessionRunId };
-  };
 
   beforeEach(() => {
-    mkdirSync(testDir, { recursive: true });
-    const config = createPluginConfig({ eventsDir: testDir });
-    writer = new EventWriter(sessionRunId, config);
+    dir = mkdtempSync(join(tmpdir(), 'omp-usage-writer-'));
+    config = { ...DEFAULT_PLUGIN_CONFIG, eventsDir: join(dir, 'events'), flushIntervalMs: 20 };
+    writer = new EventWriter(randomUUID(), config);
   });
-
   afterEach(async () => {
     await writer.close();
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const lines = () =>
+    readFileSync(writer.getFilePath(), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map(l => JSON.parse(l) as UsageEvent);
+
+  it('creates the directory and file with restrictive permissions', async () => {
+    writer.write(event());
+    await tick();
+    expect(statSync(config.eventsDir).mode & 0o777).toBe(0o700);
+    expect(statSync(writer.getFilePath()).mode & 0o777).toBe(0o600);
+  });
+
+  it('writes events right after the current tick, batched into complete lines', async () => {
+    const a = event();
+    const b = event();
+    writer.write(a);
+    writer.write(b);
+    expect(existsSync(writer.getFilePath())).toBe(false); // still in the same tick
+    await tick();
+    expect(lines().map(e => e.eventId)).toEqual([a.eventId, b.eventId]);
+    expect(readFileSync(writer.getFilePath(), 'utf8').endsWith('\n')).toBe(true);
+    expect(writer.getStats()).toMatchObject({ written: 2, queued: 0, dropped: 0 });
+  });
+
+  it('counts events dropped when the queue is full', async () => {
+    await writer.close();
+    writer = new EventWriter(randomUUID(), { ...config, maxQueueSize: 2 });
+    expect([writer.write(event()), writer.write(event()), writer.write(event())]).toEqual([
+      true,
+      true,
+      false,
+    ]);
+    expect(writer.getStats().dropped).toBe(1);
+    await tick();
+    expect(writer.getStats().written).toBe(2);
+  });
+
+  it('keeps events and retries after a write failure', async () => {
+    chmodSync(config.eventsDir, 0o500); // read-only directory
+    try {
+      writer.write(event());
+      await tick();
+      if (process.getuid?.() === 0) return; // root ignores permissions
+      expect(writer.getStats()).toMatchObject({ written: 0, queued: 1 });
+      expect(writer.getStats().writeErrors).toBeGreaterThan(0);
+    } finally {
+      chmodSync(config.eventsDir, 0o700);
     }
+    await vi.waitFor(() => expect(writer.getStats().written).toBe(1), { timeout: 2000 });
   });
 
-  it("writes event to queue", () => {
-    const event = createTestEvent();
-    const ok = writer.write(event);
-    expect(ok).toBe(true);
-    expect(writer.getQueueLength()).toBe(1);
+  it('re-creates the file if it is deleted while the session runs', async () => {
+    writer.write(event());
+    await tick();
+    unlinkSync(writer.getFilePath());
+    writer.write(event());
+    await tick();
+    expect(lines()).toHaveLength(1);
   });
 
-  it("flushes events to file", async () => {
-    const event = createTestEvent();
-    writer.write(event);
-    await writer.flush();
-    expect(writer.getQueueLength()).toBe(0);
-    expect(writer.getBytesWritten()).toBeGreaterThan(0);
+  it('refuses to follow a symlink planted at the session file path', async () => {
+    const target = join(dir, 'target');
+    writeFileSync(target, '');
+    symlinkSync(target, writer.getFilePath());
+    writer.write(event());
+    await tick();
+    expect(readFileSync(target, 'utf8')).toBe('');
+    expect(writer.getStats().writeErrors).toBeGreaterThan(0);
   });
 
-  it("creates JSONL file with correct content", async () => {
-    const event = createTestEvent();
-    writer.write(event);
-    await writer.flush();
-
-    const filePath = writer.getFilePath();
-    expect(existsSync(filePath)).toBe(true);
-
-    const content = readFileSync(filePath, "utf8");
-    const lines = content.trim().split("\n");
-    expect(lines).toHaveLength(1);
-    const parsed = JSON.parse(lines[0]);
-    expect(parsed.sessionRunId).toBe(sessionRunId);
-    expect(parsed.provider).toBe("openrouter");
-    expect(parsed.usage?.input).toBe(100);
+  it('flushes on close and rejects writes afterwards', async () => {
+    writer.write(event());
+    await writer.close();
+    expect(lines()).toHaveLength(1);
+    expect(writer.write(event())).toBe(false);
+    expect(writer.getStats().dropped).toBe(1);
+    await writer.close(); // idempotent
   });
 
-  it("appends multiple events to same file", async () => {
-    writer.write(createTestEvent({ eventId: "111e8400-e29b-41d4-a716-446655440001" }));
-    writer.write(createTestEvent({ eventId: "222e8400-e29b-41d4-a716-446655440002" }));
-    await writer.flush();
-
-    const content = readFileSync(writer.getFilePath(), "utf8");
-    const lines = content.trim().split("\n");
-    expect(lines).toHaveLength(2);
+  it('does not delete anything when retention is off (default)', async () => {
+    expect(DEFAULT_PLUGIN_CONFIG.retentionDays).toBeNull();
+    const oldFile = join(config.eventsDir, 'old.jsonl');
+    writeFileSync(oldFile, '{}\n');
+    const t = (Date.now() - 365 * 86_400_000) / 1000;
+    utimesSync(oldFile, t, t);
+    expect(writer.pruneOldFiles()).toBe(0);
+    expect(existsSync(oldFile)).toBe(true);
   });
 
-  it("returns false when queue is full", () => {
-    const config = createPluginConfig({ eventsDir: testDir, maxQueueSize: 2 });
-    const smallWriter = new EventWriter(sessionRunId, config);
-
-    smallWriter.write(createTestEvent());
-    smallWriter.write(createTestEvent());
-    const ok = smallWriter.write(createTestEvent());
-    expect(ok).toBe(false);
-    expect(smallWriter.getQueueLength()).toBe(2);
-  });
-
-  it("prunes old jsonl files based on retention", () => {
-    const oldFile = join(testDir, "old-session.jsonl");
-    const recentFile = join(testDir, "recent-session.jsonl");
-
-    writeFileSync(oldFile, "{}\n", "utf8");
-    writeFileSync(recentFile, "{}\n", "utf8");
-
-    const now = Date.now();
-    const oldDate = new Date(now - 10 * 24 * 60 * 60 * 1000);
-    const recentDate = new Date(now - 1 * 24 * 60 * 60 * 1000);
-    utimesSync(oldFile, oldDate, oldDate);
-    utimesSync(recentFile, recentDate, recentDate);
-
-    const config = createPluginConfig({ eventsDir: testDir, retentionDays: 3 });
-    const retentionWriter = new EventWriter(sessionRunId, config);
-    const deleted = retentionWriter.pruneOldFiles();
-
-    expect(deleted).toBeGreaterThanOrEqual(0);
+  it('opt-in retention deletes old regular files only', async () => {
+    const oldFile = join(config.eventsDir, 'old.jsonl');
+    const link = join(config.eventsDir, 'link.jsonl');
+    const other = join(config.eventsDir, 'notes.txt');
+    writeFileSync(oldFile, '{}\n');
+    writeFileSync(other, 'x');
+    symlinkSync(join(dir, 'nowhere'), link);
+    const t = (Date.now() - 10 * 86_400_000) / 1000;
+    for (const f of [oldFile, other]) utimesSync(f, t, t);
+    expect(writer.setRetentionDays(7)).toBe(1);
     expect(existsSync(oldFile)).toBe(false);
-    expect(existsSync(recentFile)).toBe(true);
+    expect(existsSync(other)).toBe(true);
+  });
+});
+
+describe('configuration', () => {
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
   });
 
-  it("updates retention at runtime", () => {
-    const config = createPluginConfig({ eventsDir: testDir, retentionDays: 30 });
-    const runtimeWriter = new EventWriter(sessionRunId, config);
-    expect(runtimeWriter.getRetentionDays()).toBe(30);
-
-    runtimeWriter.setRetentionDays(null);
-    expect(runtimeWriter.getRetentionDays()).toBeNull();
+  it('resolves ~ and defaults', () => {
+    expect(resolveEventsDir('')).toMatch(/\.local\/state\/omp-usage\/events$/);
+    expect(resolveEventsDir('~/x')).not.toContain('~');
   });
 
-  it("returns false after close", async () => {
-    await writer.close();
-    const ok = writer.write(createTestEvent());
-    expect(ok).toBe(false);
+  it('reads env strictly and ignores invalid values', () => {
+    process.env['OMP_USAGE_MAX_QUEUE_SIZE'] = '10abc';
+    process.env['OMP_USAGE_FLUSH_INTERVAL_MS'] = '250';
+    process.env['OMP_USAGE_RETENTION_DAYS'] = '14';
+    const c = createPluginConfig();
+    expect(c.maxQueueSize).toBe(DEFAULT_PLUGIN_CONFIG.maxQueueSize);
+    expect(c.flushIntervalMs).toBe(250);
+    expect(c.retentionDays).toBe(14);
   });
 
-  it("closes and flushes remaining events", async () => {
-    writer.write(createTestEvent());
-    writer.write(createTestEvent());
-    await writer.close();
-    expect(writer.getQueueLength()).toBe(0);
-  });
-
-  it("uses correct file permissions", async () => {
-    writer.write(createTestEvent());
-    await writer.flush();
-
-    const filePath = writer.getFilePath();
-    const stats = statSync(filePath);
-    const mode = stats.mode & 0o777;
-    expect(mode).toBe(0o600);
+  it.each([
+    ['off', null],
+    ['0', null],
+    ['', null],
+    ['7', 7],
+    ['-1', undefined],
+    ['7days', undefined],
+  ])('parseRetentionDays(%j) = %j', (input, expected) => {
+    expect(parseRetentionDays(input)).toBe(expected);
   });
 });

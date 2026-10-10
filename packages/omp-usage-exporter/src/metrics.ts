@@ -85,6 +85,7 @@ export interface ExporterMetrics {
   registry: Registry;
   importErrorsTotal: Counter<'reason'>;
   fileResetsTotal: Counter<'reason'>;
+  filesDeletedTotal: Counter;
 }
 
 /**
@@ -256,6 +257,12 @@ export function createMetrics(
     registers: [registry],
   });
 
+  const filesDeletedTotal = new Counter({
+    name: 'omp_usage_files_deleted_total',
+    help: 'Fully imported event files deleted by --retention-days since process start',
+    registers: [registry],
+  });
+
   new Gauge({
     name: 'omp_usage_last_import_timestamp_seconds',
     help: 'Unix time of the last successful import cycle',
@@ -318,5 +325,5 @@ export function createMetrics(
   });
   buildInfo.set({ version: options.version, node_version: process.version }, 1);
 
-  return { registry, importErrorsTotal, fileResetsTotal };
+  return { registry, importErrorsTotal, fileResetsTotal, filesDeletedTotal };
 }

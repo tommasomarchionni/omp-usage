@@ -88,10 +88,24 @@ describe("UsageEventSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects unknown stopReason", () => {
-    const event = { ...validEventBase, stopReason: "unknown" };
-    const result = safeValidateEvent(event);
-    expect(result.success).toBe(false);
+  it("accepts a stop reason introduced by a newer OMP version", () => {
+    const event = { ...validEventBase, stopReason: "refusal" };
+    expect(safeValidateEvent(event).success).toBe(true);
+  });
+
+  it("rejects empty or oversized stopReason", () => {
+    expect(safeValidateEvent({ ...validEventBase, stopReason: "" }).success).toBe(false);
+    expect(safeValidateEvent({ ...validEventBase, stopReason: "x".repeat(65) }).success).toBe(false);
+  });
+
+  it("accepts usage without cost (missing cost is not zero)", () => {
+    const event = { ...validEventBase, usage: { input: 1, output: 2 } };
+    expect(safeValidateEvent(event).success).toBe(true);
+  });
+
+  it("rejects non-finite numbers", () => {
+    const event = { ...validEventBase, usage: { input: Number.POSITIVE_INFINITY } };
+    expect(safeValidateEvent(event).success).toBe(false);
   });
 
   it("rejects unknown eventType", () => {

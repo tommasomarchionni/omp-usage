@@ -147,15 +147,11 @@ Not supported in v1 (no WAL archiving). For PITR, use filesystem snapshots (APFS
 
 ### Events Files
 
-Plugin creates one file per OMP session. No automatic cleanup.
+The plugin creates one file per OMP session binding. Nothing is deleted by default.
 
-**Manual cleanup**:
-```bash
-# Delete events older than 30 days
-find ~/.local/state/omp-usage/events -name "*.jsonl" -mtime +30 -delete
-```
+**Recommended**: `omp-usage-exporter --retention-days 30`. The exporter deletes a file only when its cursor matches the file's inode and device, every byte has been imported, and the file has not been modified for 30 days. Unimported data is never deleted.
 
-**Recommended**: Keep at least 7 days for exporter re-import capability.
+Avoid `find ... -mtime +30 -delete`: it does not know whether the exporter imported the files.
 
 ### Database
 

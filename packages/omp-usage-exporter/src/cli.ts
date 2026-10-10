@@ -44,6 +44,10 @@ export async function main(argv: string[] = process.argv): Promise<number> {
       '--shutdown-timeout-ms <ms>',
       'graceful shutdown budget [env OMP_USAGE_SHUTDOWN_TIMEOUT_MS]'
     )
+    .option(
+      '--retention-days <days>',
+      'delete fully imported event files idle for N days (default: never) [env OMP_USAGE_EXPORTER_RETENTION_DAYS]'
+    )
     .option('--no-watch', 'disable fs.watch and rely on polling only (network filesystems)')
     .option('--config-check', 'validate configuration, print it as JSON and exit')
     .option('--import-once', 'run a single import cycle and exit')
@@ -69,6 +73,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
     maxLabelCardinality?: string;
     pollIntervalMs?: string;
     shutdownTimeoutMs?: string;
+    retentionDays?: string;
     watch: boolean;
     configCheck?: boolean;
     importOnce?: boolean;
@@ -87,6 +92,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
       maxLabelCardinality: opts.maxLabelCardinality,
       pollIntervalMs: opts.pollIntervalMs,
       shutdownTimeoutMs: opts.shutdownTimeoutMs,
+      retentionDays: opts.retentionDays,
     };
     config = resolveConfig(flags);
   } catch (e) {

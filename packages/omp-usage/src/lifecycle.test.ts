@@ -1,102 +1,151 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { initializePlugin } from "./lifecycle.js";
-import type { OmpApi, PluginConfig } from "./types.js";
-describe("initializePlugin", () => {
-  let mockApi: OmpApi;
-  let messageEndHandler: ((event: { message: unknown }) => void) | null;
-  let shutdownHandler: (() => void | Promise<void>) | null;
-  let commandHandler: ((args: string, ctx: { ui?: { notify?: (message: string, type?: string) => void } }) =>
-    | void
-    | Promise<void>)
-    | null;
-  let config: Partial<PluginConfig>;
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { initializePlugin } from './lifecycle.js';
+import type { ExtensionCommandContext, OmpApi } from './types.js';
 
+type Handler = (...args: unknown[]) => unknown;
+
+function fakeOmp() {
+  const handlers = new Map<string, Handler[]>();
+  const commands = new Map<string, (args: string, ctx: ExtensionCommandContext) => unknown>();
+  const api = {
+    on(event: string, handler: Handler) {
+      handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+    },
+    registerCommand(
+      name: string,
+      opts: { handler: (a: string, c: ExtensionCommandContext) => unknown }
+    ) {
+      commands.set(name, opts.handler);
+    },
+  } as unknown as OmpApi;
+  const emit = async (event: string, payload?: unknown) => {
+    for (const h of handlers.get(event) ?? []) await h(payload);
+  };
+  const run = async (args: string) => {
+    const out: Array<[string, string | undefined]> = [];
+    await commands.get('omp-usage')!(args, { ui: { notify: (m, t) => out.push([m, t]) } });
+    return out;
+  };
+  return { api, handlers, emit, run };
+}
+
+const msg = (over: Record<string, unknown> = {}) => ({
+  role: 'assistant',
+  provider: 'openrouter',
+  model: 'openrouter/free',
+  stopReason: 'stop',
+  timestamp: Date.now(),
+  usage: { input: 10, output: 2 },
+  ...over,
+});
+
+describe('initializePlugin', () => {
+  let dir: string;
   beforeEach(() => {
-    messageEndHandler = null;
-    shutdownHandler = null;
-    commandHandler = null;
-    config = { eventsDir: "/tmp/test-events", maxQueueSize: 100 };
+    dir = mkdtempSync(join(tmpdir(), 'omp-usage-life-'));
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-    mockApi = {
-      on: (event, handler) => {
-        if (event === "message_end") {
-          messageEndHandler = handler as (event: { message: unknown }) => void;
-        } else if (event === "shutdown") {
-          shutdownHandler = handler as () => void | Promise<void>;
-        }
-      },
-      registerCommand: (_name, options) => {
-        commandHandler = options.handler;
-      },
-    };
+  const files = () => readdirSync(dir).filter(f => f.endsWith('.jsonl'));
+  const events = () =>
+    files().flatMap(f =>
+      readFileSync(join(dir, f), 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map(l => JSON.parse(l) as Record<string, unknown>)
+    );
+
+  it('registers message_end and session_shutdown (not the non-existent "shutdown")', () => {
+    const omp = fakeOmp();
+    initializePlugin(omp.api, { eventsDir: dir });
+    expect([...omp.handlers.keys()].sort()).toEqual(['message_end', 'session_shutdown']);
   });
 
-  it("registers message_end and shutdown handlers", () => {
-    const _cleanup = initializePlugin(mockApi, config);
-    expect(messageEndHandler).not.toBeNull();
-    expect(shutdownHandler).not.toBeNull();
-    expect(commandHandler).not.toBeNull();
-    expect(typeof _cleanup).toBe("function");
-  });
-
-  it("returns status via /omp-usage status", async () => {
-    initializePlugin(mockApi, config);
-    const notifications: string[] = [];
-    await commandHandler!("status", {
-      ui: {
-        notify: (message) => notifications.push(message),
-      },
+  it('records assistant messages and flushes on session_shutdown', async () => {
+    const omp = fakeOmp();
+    initializePlugin(omp.api, { eventsDir: dir });
+    await omp.emit('message_end', { message: msg() });
+    await omp.emit('message_end', { message: { role: 'user', content: 'hi' } });
+    await omp.emit('session_shutdown');
+    const ev = events();
+    expect(ev).toHaveLength(1);
+    expect(ev[0]).toMatchObject({
+      provider: 'openrouter',
+      model: 'openrouter/free',
+      schemaVersion: 1,
     });
-    expect(notifications[0]).toContain("retention=");
-    expect(notifications[0]).toContain("eventsDir=");
   });
 
-  it("updates retention via /omp-usage retention", async () => {
-    initializePlugin(mockApi, config);
-    const notifications: string[] = [];
-    const ctx = {
-      ui: {
-        notify: (message: string) => notifications.push(message),
+  it('never throws into OMP, whatever the payload', async () => {
+    const omp = fakeOmp();
+    initializePlugin(omp.api, { eventsDir: dir });
+    for (const p of [
+      undefined,
+      null,
+      1,
+      { message: null },
+      {
+        get message() {
+          throw new Error('x');
+        },
       },
-    };
-
-    await commandHandler!("retention 5", ctx);
-    await commandHandler!("retention", ctx);
-
-    expect(notifications.some((line) => line.includes("Retention updated to 5 days"))).toBe(true);
-    expect(notifications.some((line) => line.includes("Current retention: 5 days"))).toBe(true);
+    ]) {
+      await expect(omp.emit('message_end', p)).resolves.toBeUndefined();
+    }
   });
 
-  it("calls shutdown handler on shutdown event", async () => {
-    const _cleanup = initializePlugin(mockApi, config);
-    await shutdownHandler!();
-    // Should not throw
+  it('does not record the same message twice (replayed history)', async () => {
+    const omp = fakeOmp();
+    initializePlugin(omp.api, { eventsDir: dir });
+    const m = msg({ timestamp: 123 });
+    await omp.emit('message_end', { message: m });
+    await omp.emit('message_end', { message: { ...m } });
+    await omp.emit('message_end', { message: msg({ timestamp: 124 }) });
+    await omp.emit('session_shutdown');
+    expect(events()).toHaveLength(2);
+    const [[status]] = await omp.run('status');
+    expect(status).toContain('duplicatesSkipped=1');
   });
 
-  it("cleanup function calls shutdown", async () => {
-    const _cleanup = initializePlugin(mockApi, config);
-    await _cleanup();
-    // Should not throw
+  it('uses one file per session binding (subagents get their own file)', async () => {
+    const parent = fakeOmp();
+    const child = fakeOmp();
+    initializePlugin(parent.api, { eventsDir: dir });
+    initializePlugin(child.api, { eventsDir: dir });
+    await parent.emit('message_end', { message: msg({ timestamp: 1 }) });
+    await child.emit('message_end', { message: msg({ timestamp: 2 }) });
+    await parent.emit('session_shutdown');
+    await child.emit('session_shutdown');
+    expect(files()).toHaveLength(2);
+    const runs = new Set(events().map(e => e['sessionRunId']));
+    expect(runs.size).toBe(2);
   });
 
-  it("ignores non-assistant messages", async () => {
-    const cleanup = initializePlugin(mockApi, config);
-    const userMessage = { role: "user", content: "hello" };
-    messageEndHandler!({ message: userMessage });
-    await cleanup();
+  it('status reports drops and warns', async () => {
+    const omp = fakeOmp();
+    initializePlugin(omp.api, { eventsDir: dir, maxQueueSize: 1 });
+    await Promise.all([
+      omp.emit('message_end', { message: msg({ timestamp: 1 }) }),
+      omp.emit('message_end', { message: msg({ timestamp: 2 }) }),
+    ]);
+    const [[text, level]] = await omp.run('status');
+    expect(text).toMatch(/dropped=1/);
+    expect(level).toBe('warning');
   });
 
-  it("handles message with null fields", async () => {
-    const cleanup = initializePlugin(mockApi, config);
-    const message = {
-      role: "assistant",
-      provider: null,
-      model: null,
-      api: null,
-      stopReason: "error",
-      usage: null,
-    };
-    messageEndHandler!({ message });
-    await cleanup();
+  it('retention commands: off by default, warn when enabled', async () => {
+    const omp = fakeOmp();
+    initializePlugin(omp.api, { eventsDir: dir });
+    expect((await omp.run('retention'))[0]![0]).toBe('Current retention: off');
+    expect((await omp.run('prune'))[0]![0]).toMatch(/Retention is off/);
+    const [[text, level]] = await omp.run('retention 30');
+    expect(level).toBe('warning');
+    expect(text).toMatch(/--retention-days/);
+    expect((await omp.run('retention abc'))[0]![1]).toBe('error');
+    expect((await omp.run('retention off'))[0]![0]).toBe('Retention disabled.');
+    expect((await omp.run('bogus'))[0]![1]).toBe('error');
   });
 });

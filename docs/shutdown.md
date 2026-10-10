@@ -2,33 +2,11 @@
 
 ## Plugin Shutdown
 
-The plugin registers an OMP `shutdown` handler that:
-1. Stops accepting new events
-2. Flushes the in-memory queue to disk
-3. Closes the file handle
+The plugin listens for OMP's `session_shutdown` event (handlers run concurrently with a **2-second budget**, see the [OMP extension docs](https://github.com/can1357/oh-my-pi/blob/main/docs/extensions.md)). It writes any pending events synchronously, then stops accepting new ones.
 
-```typescript
-// In lifecycle.ts
-api.on("shutdown", () => {
-  await writer.close();
-});
-```
+Versions up to 0.3.1 registered a handler for `shutdown`, an event OMP never emits. Their final flush only happened if the 1-second timer fired before exit.
 
-### Timing
-
-- **Flush interval**: 1 second (default)
-- **Max events at risk**: `maxQueueSize` (default 1000)
-- **Worst-case loss**: Events in queue at crash time
-
-### OMP Lifecycle Events
-
-Verified on OMP 18.8.6:
-- `message_end` — Assistant message completed
-- `shutdown` — OMP shutting down
-
-Not verified:
-- `session_end` — May not exist
-- `extension_unload` — May not exist
+Because events are written right after each `message_end` handler, the shutdown flush normally has nothing left to do. A synchronous flush on process `exit` covers the remaining case.
 
 ## Exporter Shutdown
 
@@ -113,7 +91,7 @@ STOPSIGNAL SIGTERM
 
 | Component | Data at Risk |
 |-----------|--------------|
-| Plugin queue | Up to `maxQueueSize` events (default 1000) |
+| Plugin | Only events of the handler running at kill time (pending retries if the disk was failing) |
 | Exporter batch | Nothing: uncommitted lines are re-read after restart |
 | SQLite WAL | Uncheckpointed pages (recovered on next open) |
 | HTTP requests | In-flight `/metrics` responses (client gets error) |

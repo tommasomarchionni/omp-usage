@@ -22,14 +22,16 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && vitest run --pool=threads --maxWorkers=1",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit"
+    "pretest": "npm run build",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "@tommasomarchionni/omp-usage-protocol": "0.1.0"
   },
   "omp": {
     "extensions": [

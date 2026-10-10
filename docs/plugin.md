@@ -4,10 +4,11 @@ The OMP plugin (`@tommasomarchionni/omp-usage`) runs inside Oh My Pi and collect
 
 ## How It Works
 
-1. **Loads on OMP startup** — The plugin registers event handlers via OMP's extension API.
-2. **Listens for `message_end`** — When an assistant message completes, the plugin extracts usage data.
-3. **Writes JSONL events** — One file per OMP session (`<sessionRunId>.jsonl`) in the configured directory.
-4. **Flushes on shutdown** — Ensures all queued events are written before OMP exits.
+1. **Loads on OMP startup**: the plugin registers handlers through the OMP extension API.
+2. **Listens for `message_end`**: when an assistant message completes, the plugin copies **only usage metadata** from the payload. Content, tool input/output, headers and unknown fields are never written.
+3. **Writes JSONL immediately**: events are appended as soon as the current OMP handler returns, with one write per batch of complete lines, to a file named `<sessionRunId>.jsonl`.
+4. **Flushes on `session_shutdown`**: OMP gives shutdown handlers a 2-second budget, and the flush is synchronous. A synchronous flush on process `exit` is the last resort.
+5. **Never affects the agent**: handler errors are caught and counted, and the plugin never throws into OMP.
 
 ## Event Schema (v1)
 
@@ -54,7 +55,7 @@ Each event is a JSON object with these fields:
 | `provider` | string/null | Provider name (e.g., `"openrouter"`, `"anthropic"`) |
 | `model` | string/null | Model identifier as reported by OMP |
 | `api` | string/null | API transport (e.g., `"openrouter"`, `"anthropic-messages"`) |
-| `stopReason` | string/null | Why generation stopped: `"stop"`, `"length"`, `"toolUse"`, `"error"`, `"aborted"` |
+| `stopReason` | string/null | Why generation stopped: `"stop"`, `"length"`, `"toolUse"`, `"error"`, `"aborted"`; values added by newer OMP versions are passed through (max 64 chars) |
 | `usage` | object/null | Usage data, or `null` if not reported |
 
 ### Usage Fields
@@ -67,7 +68,9 @@ Each event is a JSON object with these fields:
 | `cacheWrite` | integer | Tokens written to prompt cache |
 | `totalTokens` | integer | Sum of all token buckets |
 | `reasoningTokens` | integer | Reasoning/thinking tokens (subset of `output`) |
-| `cost` | object | Reported cost breakdown |
+| `cost` | object, optional | Reported cost breakdown (USD); absent when the provider does not report it |
+
+Every numeric field is validated individually: negative, `NaN`, infinite or non-integer token counts are **dropped** (and counted in `/omp-usage status` as `sanitizedFields`) rather than making the whole event invalid. A missing field is never replaced with zero.
 
 ## File Layout
 
@@ -80,31 +83,40 @@ Each event is a JSON object with these fields:
 
 Each file contains one JSON object per line (JSONL format).
 
-## Queue & Flush Behavior
+## Write Behavior
 
-- **In-memory queue** (default 1000 events)
-- **Periodic flush** (default every 1 second)
-- **Non-blocking**: If queue is full, new events are dropped (logged as warning)
-- **Graceful shutdown**: Flushes queue on OMP shutdown
+| Aspect | Behavior |
+|---|---|
+| Latency | Written at the end of the current tick (microtask), not on a timer |
+| Atomicity | Each batch is one `write()` of complete `\n`-terminated lines; the exporter ignores a trailing partial line |
+| File open | `O_APPEND \| O_CREAT \| O_NOFOLLOW` by path for each batch: a deleted file is re-created, a planted symlink is refused |
+| Failure | Events stay queued (max `OMP_USAGE_MAX_QUEUE_SIZE`, default 1000) and are retried every `OMP_USAGE_FLUSH_INTERVAL_MS` (default 1 s) |
+| Overflow | New events are dropped and counted (`dropped` in `/omp-usage status`) |
+| Replays | A message carrying the same OMP timestamp, model and token counts is recorded only once per session |
 
 ## Retention
 
-- **Default retention**: 30 days (`OMP_USAGE_RETENTION_DAYS=30`)
-- **Disable retention**: set `OMP_USAGE_RETENTION_DAYS=off` (or `0`)
-- **Cleanup cadence**: periodic background prune plus prune-after-flush
-- **Scope**: deletes old `*.jsonl` files from events directory (keeps current session file)
+**Off by default.** The plugin cannot know whether the exporter has already imported a file, so deleting by age can lose data (for example if the exporter was stopped for longer than the retention period).
 
-### Runtime control
+Recommended: let the exporter delete files it has fully imported:
 
-Use slash commands from OMP chat:
+```bash
+omp-usage-exporter --retention-days 30
+```
+
+The plugin retention is still available as an explicit opt-in (`OMP_USAGE_RETENTION_DAYS=14` or `/omp-usage retention 14`). It deletes regular `*.jsonl` files older than N days, except the current session file and symlinks.
+
+### Runtime commands
 
 ```text
-/omp-usage status
-/omp-usage retention
-/omp-usage retention 7
+/omp-usage status          # file, written, queued, dropped, writeErrors, duplicatesSkipped, ...
+/omp-usage retention       # show
+/omp-usage retention 14    # enable for this session (warning shown)
 /omp-usage retention off
 /omp-usage prune
 ```
+
+`status` is shown as a warning when events were dropped or writes failed.
 
 ## Permissions
 
@@ -113,12 +125,12 @@ Use slash commands from OMP chat:
 
 ## Data Loss Scenarios
 
-| Scenario | Events Lost |
+| Scenario | Events lost |
 |----------|-------------|
-| OMP crashes between flushes | Up to 1 second of events (default) |
-| Queue full (1000 events) | New events dropped until flush |
-| Disk full | Events not written, logged as error |
-| Process killed (SIGKILL) | Unflushed queue lost |
+| OMP killed (`SIGKILL`) or crash | Only events of the handler that was running; earlier events are already on disk (covered by an e2e test) |
+| Disk full / unwritable directory | None while the queue has room; retried every second, then counted as `dropped` |
+| Queue full (1000 events pending) | New events, counted as `dropped` |
+| `session_shutdown` exceeds 2 s | Not expected (synchronous local write); the `exit` hook flushes again |
 
 ## Verified Provider Coverage
 
@@ -131,9 +143,11 @@ Use slash commands from OMP chat:
 | Google | ❓ Not tested |
 | Ollama | ❓ Not tested |
 
-## Subagent / Direct Plugin Calls
+## Subagents
 
-Current status: **Not verified**. The plugin only intercepts `message_end` events from the main OMP conversation. Subagent invocations and direct plugin calls may or may not emit this event. Test and document your specific use case.
+The [OMP extension documentation](https://github.com/can1357/oh-my-pi/blob/main/docs/extensions.md) states that factories are **rebound to every subagent session** (task tool, `agent()`, clones) with a fresh API. Each binding gets its own `sessionRunId` and its own JSONL file, so subagent usage is recorded once, in its own file.
+
+Not verified yet on a real OMP: whether restricted children and direct model calls made by other plugins emit `message_end`. Check with `/omp-usage status` in a subagent and report the result.
 
 ## Troubleshooting
 

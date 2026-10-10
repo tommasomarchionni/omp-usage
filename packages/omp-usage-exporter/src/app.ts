@@ -68,6 +68,7 @@ export function createApp(config: ResolvedConfig, options: CreateAppOptions): Ex
     eventsDir: config.eventsDir,
     pollIntervalMs: config.pollIntervalMs,
     watch: options.watch,
+    retentionDays: config.retentionDays,
   });
 
   const server = new ExporterServer(metrics.registry, db, state, {
