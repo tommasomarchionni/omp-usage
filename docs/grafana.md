@@ -15,7 +15,7 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
       "id": 1,
       "title": "Tokens per Second (by Provider)",
       "type": "timeseries",
-      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
       "targets": [
         {
           "expr": "sum by (provider) (rate(omp_llm_tokens_total[5m]))",
@@ -26,7 +26,7 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
-          "custom": {"lineWidth": 2}
+          "custom": { "lineWidth": 2 }
         }
       }
     },
@@ -34,7 +34,7 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
       "id": 2,
       "title": "Tokens per Second (by Model)",
       "type": "timeseries",
-      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
       "targets": [
         {
           "expr": "sum by (model, direction) (rate(omp_llm_tokens_total[5m]))",
@@ -43,14 +43,14 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "ops"}
+        "defaults": { "unit": "ops" }
       }
     },
     {
       "id": 3,
       "title": "Requests per Second (Success vs Error)",
       "type": "timeseries",
-      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
       "targets": [
         {
           "expr": "sum by (status) (rate(omp_llm_requests_total[5m]))",
@@ -59,14 +59,14 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "ops"}
+        "defaults": { "unit": "ops" }
       }
     },
     {
       "id": 4,
       "title": "Error Rate by Provider",
       "type": "timeseries",
-      "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
       "targets": [
         {
           "expr": "sum by (provider) (rate(omp_llm_requests_total{status=\"error\"}[5m])) / sum by (provider) (rate(omp_llm_requests_total[5m]))",
@@ -86,7 +86,7 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
       "id": 5,
       "title": "Reasoning Tokens per Second",
       "type": "timeseries",
-      "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
       "targets": [
         {
           "expr": "sum by (provider, model) (rate(omp_llm_reasoning_tokens_total[5m]))",
@@ -95,14 +95,14 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "ops"}
+        "defaults": { "unit": "ops" }
       }
     },
     {
       "id": 6,
       "title": "Reported Cost per Hour (USD)",
       "type": "timeseries",
-      "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
       "targets": [
         {
           "expr": "sum by (provider, model) (rate(omp_llm_reported_cost_usd_total[1h]))",
@@ -121,7 +121,7 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
       "id": 7,
       "title": "Missing Usage Events",
       "type": "timeseries",
-      "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8},
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
       "targets": [
         {
           "expr": "sum by (provider, model) (rate(omp_llm_usage_missing_total[5m]))",
@@ -130,14 +130,14 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "ops"}
+        "defaults": { "unit": "ops" }
       }
     },
     {
       "id": 8,
       "title": "Exporter Health",
       "type": "stat",
-      "gridPos": {"x": 12, "y": 24, "w": 6, "h": 4},
+      "gridPos": { "x": 12, "y": 24, "w": 6, "h": 4 },
       "targets": [
         {
           "expr": "omp_usage_last_import_timestamp_seconds",
@@ -146,17 +146,15 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
       ],
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "thresholds"},
+          "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "green", "value": null},
-              {"color": "red", "value": 300}
+              { "color": "green", "value": null },
+              { "color": "red", "value": 300 }
             ]
           },
-          "mappings": [
-            {"type": "value", "options": {"0": {"text": "Never", "color": "red"}}}
-          ]
+          "mappings": [{ "type": "value", "options": { "0": { "text": "Never", "color": "red" } } }]
         }
       },
       "options": {
@@ -169,7 +167,7 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
       "id": 9,
       "title": "Import Errors (5m)",
       "type": "stat",
-      "gridPos": {"x": 18, "y": 24, "w": 6, "h": 4},
+      "gridPos": { "x": 18, "y": 24, "w": 6, "h": 4 },
       "targets": [
         {
           "expr": "increase(omp_usage_import_errors_total[5m])",
@@ -178,24 +176,24 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
       ],
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "thresholds"},
+          "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 1},
-              {"color": "red", "value": 10}
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
             ]
           }
         }
       },
-      "options": {"textMode": "value", "graphMode": "none"}
+      "options": { "textMode": "value", "graphMode": "none" }
     },
     {
       "id": 10,
       "title": "Label Cardinality",
       "type": "gauge",
-      "gridPos": {"x": 12, "y": 28, "w": 12, "h": 8},
+      "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 },
       "targets": [
         {
           "expr": "omp_usage_label_cardinality",
@@ -209,9 +207,9 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 700},
-              {"color": "red", "value": 900}
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 700 },
+              { "color": "red", "value": 900 }
             ]
           },
           "unit": "short"
@@ -224,7 +222,7 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
       {
         "name": "provider",
         "type": "query",
-        "datasource": {"uid": "prometheus"},
+        "datasource": { "uid": "prometheus" },
         "query": "label_values(omp_llm_tokens_total, provider)",
         "multi": true,
         "includeAll": true,
@@ -233,7 +231,7 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
       {
         "name": "model",
         "type": "query",
-        "datasource": {"uid": "prometheus"},
+        "datasource": { "uid": "prometheus" },
         "query": "label_values(omp_llm_tokens_total, model)",
         "multi": true,
         "includeAll": true,
@@ -283,22 +281,23 @@ datasources:
 
 ## Panel Descriptions
 
-| Panel | Purpose |
-|-------|---------|
-| Tokens/sec by Provider | Overall throughput per provider |
-| Tokens/sec by Model | Breakdown by model and direction |
-| Requests/sec | Success vs error rate |
-| Error Rate | Percentage of failed requests |
-| Reasoning Tokens | Thinking tokens per model |
-| Cost/hour | Reported cost trend |
-| Missing Usage | Events without usage data |
-| Exporter Health | Last import timestamp (green=recent, red=stale) |
-| Import Errors | Recent import error count |
-| Label Cardinality | Current (provider,model) pair count |
+| Panel                  | Purpose                                         |
+| ---------------------- | ----------------------------------------------- |
+| Tokens/sec by Provider | Overall throughput per provider                 |
+| Tokens/sec by Model    | Breakdown by model and direction                |
+| Requests/sec           | Success vs error rate                           |
+| Error Rate             | Percentage of failed requests                   |
+| Reasoning Tokens       | Thinking tokens per model                       |
+| Cost/hour              | Reported cost trend                             |
+| Missing Usage          | Events without usage data                       |
+| Exporter Health        | Last import timestamp (green=recent, red=stale) |
+| Import Errors          | Recent import error count                       |
+| Label Cardinality      | Current (provider,model) pair count             |
 
 ## Variables
 
 The dashboard includes `provider` and `model` variables for filtering. Add panel queries like:
+
 ```promql
 sum by (direction) (rate(omp_llm_tokens_total{provider=~"$provider", model=~"$model"}[5m]))
 ```

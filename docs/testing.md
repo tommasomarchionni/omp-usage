@@ -21,11 +21,11 @@ npm run test -- --coverage
 
 Located in `src/**/*.test.ts` alongside source files.
 
-| Package | Tests |
-|---------|-------|
+| Package  | Tests                                               |
+| -------- | --------------------------------------------------- |
 | Protocol | Schema validation, event creation, accounting rules |
-| Plugin | Writer queue/flush, event extraction, lifecycle |
-| Exporter | Config, database, importer, metrics, server |
+| Plugin   | Writer queue/flush, event extraction, lifecycle     |
+| Exporter | Config, database, importer, metrics, server         |
 
 ### Integration Tests
 
@@ -37,11 +37,12 @@ npm run test:integration
 ```
 
 **Integration test scenarios**:
+
 1. **End-to-end**: Plugin → JSONL → Exporter → Prometheus
 2. **Restart recovery**: Exporter restart re-imports correctly
 3. **File rotation**: Handles renamed/truncated/replaced files
 4. **Concurrent OMP sessions**: Multiple JSONL files
-4. **Schema evolution**: Unknown version handling
+5. **Schema evolution**: Unknown version handling
 
 ### Manual Testing
 
@@ -88,26 +89,26 @@ curl -s http://127.0.0.1:9464/healthz | jq .
 
 Per spec, these scenarios MUST pass:
 
-| Scenario | Test Location |
-|----------|---------------|
-| Successful event with input/output | `protocol/schema.test.ts` |
-| Error event with zero tokens | `protocol/schema.test.ts` |
-| Error event with non-zero usage | `protocol/schema.test.ts` |
-| Missing usage (null) | `protocol/schema.test.ts` |
+| Scenario                           | Test Location               |
+| ---------------------------------- | --------------------------- |
+| Successful event with input/output | `protocol/schema.test.ts`   |
+| Error event with zero tokens       | `protocol/schema.test.ts`   |
+| Error event with non-zero usage    | `protocol/schema.test.ts`   |
+| Missing usage (null)               | `protocol/schema.test.ts`   |
 | Reasoning tokens (no double-count) | `protocol/validate.test.ts` |
-| Cache read/write separate | `protocol/schema.test.ts` |
-| Duplicate eventId import | `exporter/database.test.ts` |
-| Exporter restart | `tests/e2e.test.ts` |
-| Incomplete line then completed | `exporter/importer.test.ts` |
-| Malformed record between valid | `exporter/importer.test.ts` |
-| Unknown schema version | `exporter/importer.test.ts` |
-| File truncation/rotation/replace | `tests/e2e.test.ts` |
-| Two OMP sessions (two files) | `tests/e2e.test.ts` |
-| Crash/rollback during import | `tests/e2e.test.ts` |
-| Restore metrics from SQLite | `tests/e2e.test.ts` |
-| Label escaping | `exporter/metrics.test.ts` |
-| HTTP endpoints + shutdown | `exporter/server.test.ts` |
-| npm pack + install | CI: `package-smoke` job |
+| Cache read/write separate          | `protocol/schema.test.ts`   |
+| Duplicate eventId import           | `exporter/database.test.ts` |
+| Exporter restart                   | `tests/e2e.test.ts`         |
+| Incomplete line then completed     | `exporter/importer.test.ts` |
+| Malformed record between valid     | `exporter/importer.test.ts` |
+| Unknown schema version             | `exporter/importer.test.ts` |
+| File truncation/rotation/replace   | `tests/e2e.test.ts`         |
+| Two OMP sessions (two files)       | `tests/e2e.test.ts`         |
+| Crash/rollback during import       | `tests/e2e.test.ts`         |
+| Restore metrics from SQLite        | `tests/e2e.test.ts`         |
+| Label escaping                     | `exporter/metrics.test.ts`  |
+| HTTP endpoints + shutdown          | `exporter/server.test.ts`   |
+| npm pack + install                 | CI: `package-smoke` job     |
 
 ## Running Tests in CI
 
@@ -120,8 +121,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: "npm"
+          node-version: '22'
+          cache: 'npm'
       - run: npm ci
       - run: npm run build
       - run: npm run test
@@ -132,6 +133,7 @@ jobs:
 Tests require `better-sqlite3` compiled for the platform.
 
 ### macOS
+
 ```bash
 # Requires Xcode Command Line Tools
 xcode-select --install
@@ -139,6 +141,7 @@ npm install
 ```
 
 ### Linux (CI)
+
 ```bash
 # Ubuntu/Debian
 apt-get update && apt-get install -y python3 make g++
@@ -165,14 +168,14 @@ Helper functions in `tests/fixtures/` (if needed):
 export function createValidEvent(overrides = {}) {
   return {
     schemaVersion: 1,
-    eventId: "550e8400-e29b-41d4-a716-446655440000",
-    sessionRunId: "660e8400-e29b-41d4-a716-446655440001",
+    eventId: '550e8400-e29b-41d4-a716-446655440000',
+    sessionRunId: '660e8400-e29b-41d4-a716-446655440001',
     timestamp: new Date().toISOString(),
-    eventType: "assistant_message_end",
-    provider: "openrouter",
-    model: "openrouter/free",
-    api: "openrouter",
-    stopReason: "stop",
+    eventType: 'assistant_message_end',
+    provider: 'openrouter',
+    model: 'openrouter/free',
+    api: 'openrouter',
+    stopReason: 'stop',
     usage: {
       input: 1000,
       output: 500,
@@ -192,6 +195,7 @@ npm run bench
 ```
 
 Expected performance:
+
 - Import: > 10,000 events/second (SSD)
 - Metrics generation: < 50ms per scrape
 - Database size: ~1 KB/event
@@ -219,14 +223,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node: ["20", "22"]
+        node: ['20', '22']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-          cache: "npm"
+          cache: 'npm'
       - run: npm ci
       - run: npm run test
 ```
@@ -242,13 +246,14 @@ npm run test
 
 ## Test Coverage Goals
 
-| Package | Target |
-|---------|--------|
+| Package  | Target                            |
+| -------- | --------------------------------- |
 | Protocol | 100% (critical schema validation) |
-| Plugin | 90% (writer, lifecycle) |
+| Plugin   | 90% (writer, lifecycle)           |
 | Exporter | 85% (database, importer, metrics) |
 
 Run coverage:
+
 ```bash
 npm run test -- --coverage
 ```

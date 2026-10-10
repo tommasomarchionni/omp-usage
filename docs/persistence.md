@@ -122,11 +122,13 @@ Not supported in v1 (no WAL archiving). For PITR, use filesystem snapshots (APFS
 ### Network Filesystems (NFS, SMB)
 
 **Not recommended** for events directory or database:
+
 - File locking unreliable
 - Cursor tracking (inode/device) breaks
 - Performance issues
 
 **If required**:
+
 - Keep the database on local storage (SQLite locking over NFS/SMB is not reliable)
 - Run the exporter with `--no-watch` (polling only)
 - Expect re-reads if the server changes inode numbers; they are deduplicated
@@ -160,12 +162,13 @@ Exporter never deletes events or aggregates. Database grows over time.
 **Size estimate**: ~1 KB per event (with raw JSON)
 
 | Events/day | DB size/month |
-|------------|---------------|
-| 1,000 | ~30 MB |
-| 10,000 | ~300 MB |
-| 100,000 | ~3 GB |
+| ---------- | ------------- |
+| 1,000      | ~30 MB        |
+| 10,000     | ~300 MB       |
+| 100,000    | ~3 GB         |
 
 **Manual cleanup** (advanced):
+
 ```sql
 -- Delete events older than 90 days (keep aggregates)
 DELETE FROM events WHERE timestamp < datetime('now', '-90 days');
@@ -179,6 +182,7 @@ VACUUM;
 ### Schema Upgrades
 
 Exporter tracks schema version in `schema_info` table. On startup:
+
 1. Checks `PRAGMA user_version`
 2. Runs migrations if needed
 3. Updates version

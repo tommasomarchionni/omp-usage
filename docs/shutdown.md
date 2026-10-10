@@ -64,6 +64,7 @@ tail -n 1 ~/.local/state/omp-usage/events/*.jsonl | jq .timestamp
 ## Process Manager Config
 
 ### systemd
+
 ```ini
 [Service]
 KillSignal=SIGTERM
@@ -71,6 +72,7 @@ TimeoutStopSec=20
 ```
 
 ### launchd
+
 ```xml
 <key>RunAtLoad</key><true/>
 <key>KeepAlive</key>
@@ -81,6 +83,7 @@ TimeoutStopSec=20
 ```
 
 ### Docker
+
 ```dockerfile
 STOPSIGNAL SIGTERM
 # Default stop timeout is 10s, increase if needed
@@ -89,11 +92,11 @@ STOPSIGNAL SIGTERM
 
 ## What Gets Lost on Forced Shutdown
 
-| Component | Data at Risk |
-|-----------|--------------|
-| Plugin | Only events of the handler running at kill time (pending retries if the disk was failing) |
-| Exporter batch | Nothing: uncommitted lines are re-read after restart |
-| SQLite WAL | Uncheckpointed pages (recovered on next open) |
-| HTTP requests | In-flight `/metrics` responses (client gets error) |
+| Component      | Data at Risk                                                                              |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| Plugin         | Only events of the handler running at kill time (pending retries if the disk was failing) |
+| Exporter batch | Nothing: uncommitted lines are re-read after restart                                      |
+| SQLite WAL     | Uncheckpointed pages (recovered on next open)                                             |
+| HTTP requests  | In-flight `/metrics` responses (client gets error)                                        |
 
 **Events in SQLite**: Never lost (durable after commit).

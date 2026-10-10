@@ -3,12 +3,8 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": [
-      "ES2022"
-    ],
-    "types": [
-      "node"
-    ],
+    "lib": ["ES2022"],
+    "types": ["node"],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -24,10 +20,5 @@
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true
   },
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.test.ts",
-    "**/*.spec.ts"
-  ]
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 }

@@ -64,14 +64,14 @@ Create `~/Library/LaunchAgents/com.tommasomarchionni.omp-usage-exporter.plist`:
 
 ### Customize These Values
 
-| Key | Change To |
-|-----|-----------|
-| `ProgramArguments` | Full path to `omp-usage-exporter` (run `which omp-usage-exporter`) |
-| `OMP_USAGE_EVENTS_DIR` | Your events directory |
-| `OMP_USAGE_DB_PATH` | Your database path |
-| `OMP_USAGE_LISTEN` | Your listen address (keep `127.0.0.1` for security) |
-| `WorkingDirectory` | Your home directory |
-| `StandardOutPath` / `StandardErrorPath` | Your preferred log location |
+| Key                                     | Change To                                                          |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| `ProgramArguments`                      | Full path to `omp-usage-exporter` (run `which omp-usage-exporter`) |
+| `OMP_USAGE_EVENTS_DIR`                  | Your events directory                                              |
+| `OMP_USAGE_DB_PATH`                     | Your database path                                                 |
+| `OMP_USAGE_LISTEN`                      | Your listen address (keep `127.0.0.1` for security)                |
+| `WorkingDirectory`                      | Your home directory                                                |
+| `StandardOutPath` / `StandardErrorPath` | Your preferred log location                                        |
 
 ## Installation
 

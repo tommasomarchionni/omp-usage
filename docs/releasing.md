@@ -17,12 +17,12 @@ A failed publish can be re-run manually: **Actions → Publish to npm → Run wo
 
 For **each** package on npmjs.com (`@tommasomarchionni/omp-usage`, `@tommasomarchionni/omp-usage-exporter`): open **Settings → Trusted publishing → GitHub Actions** and enter:
 
-| Field | Value |
-|---|---|
+| Field                | Value               |
+| -------------------- | ------------------- |
 | Organization or user | `tommasomarchionni` |
-| Repository | `omp-usage` |
-| Workflow filename | `publish.yml` |
-| Environment | `npm` |
+| Repository           | `omp-usage`         |
+| Workflow filename    | `publish.yml`       |
+| Environment          | `npm`               |
 
 Then, under **Publishing access**, choose **"Require two-factor authentication and disallow tokens"** and revoke any `NPM_TOKEN` stored in the repository secrets.
 

@@ -68,9 +68,10 @@ groups:
 ```
 
 Include in `prometheus.yml`:
+
 ```yaml
 rule_files:
-  - "rules/omp_usage.yml"
+  - 'rules/omp_usage.yml'
 ```
 
 ## Alerting Rules (Optional)
@@ -86,8 +87,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "OMP Usage Exporter down"
-          description: "Exporter {{ $labels.instance }} has been down for 2 minutes"
+          summary: 'OMP Usage Exporter down'
+          description: 'Exporter {{ $labels.instance }} has been down for 2 minutes'
 
       - alert: OMPUsageImportErrors
         expr: increase(omp_usage_import_errors_total[5m]) > 10
@@ -95,8 +96,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High import error rate"
-          description: "{{ $value }} import errors in last 5 minutes"
+          summary: 'High import error rate'
+          description: '{{ $value }} import errors in last 5 minutes'
 
       - alert: OMPUsageLabelCardinalityHigh
         expr: omp_usage_label_cardinality > 800
@@ -104,8 +105,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Label cardinality approaching limit"
-          description: "Current cardinality: {{ $value }} (limit: 1000)"
+          summary: 'Label cardinality approaching limit'
+          description: 'Current cardinality: {{ $value }} (limit: 1000)'
 
       - alert: OMPUsageNoRecentImport
         expr: time() - omp_usage_last_import_timestamp_seconds > 300
@@ -113,8 +114,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "No recent import"
-          description: "Last import was {{ $value | humanizeDuration }} ago"
+          summary: 'No recent import'
+          description: 'Last import was {{ $value | humanizeDuration }} ago'
 ```
 
 ## Service Discovery (Optional)
@@ -131,6 +132,7 @@ scrape_configs:
 ```
 
 Example target file (`targets/omp_usage/mac-mini.json`):
+
 ```json
 [
   {
@@ -159,17 +161,20 @@ remote_write:
 ## Verification
 
 Test scrape:
+
 ```bash
 curl -s http://exporter.example.internal:9464/metrics | grep omp_llm
 ```
 
 Check target status in Prometheus UI:
+
 - Status → Targets → `omp_usage` job
 - Should show `UP` with recent scrape
 
 ## Retention
 
 Recommended retention for usage metrics:
+
 - **Raw samples**: 14 days (enough for hourly/daily rates)
 - **Downsampled (1h)**: 1 year (for trend analysis)
 

@@ -37,6 +37,7 @@ npm run test
 ```
 
 This runs:
+
 1. **ESLint** on all packages — static analysis for common mistakes.
 2. **TypeScript typecheck** — catches type errors.
 3. **Vitest unit tests** — exercises core logic.

@@ -6,9 +6,9 @@ OMP usage tracking plugin and Prometheus exporter for [Oh My Pi](https://github.
 
 This project provides two npm packages:
 
-| Package | Description |
-|---------|-------------|
-| `@tommasomarchionni/omp-usage` | OMP plugin that collects usage events |
+| Package                                 | Description                                                        |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| `@tommasomarchionni/omp-usage`          | OMP plugin that collects usage events                              |
 | `@tommasomarchionni/omp-usage-exporter` | Node.js service that imports events and exposes Prometheus metrics |
 
 ## Architecture
@@ -59,6 +59,7 @@ npx @tommasomarchionni/omp-usage-exporter
 ```
 
 The exporter starts on `http://127.0.0.1:9464` with:
+
 - `GET /metrics` — Prometheus metrics
 - `GET /healthz` — Health check
 
@@ -77,13 +78,13 @@ See [Grafana](grafana.md) for the dashboard JSON.
 
 ## Metrics
 
-| Metric | Type | Labels |
-|--------|------|--------|
-| `omp_llm_tokens_total` | Counter | provider, model, direction |
-| `omp_llm_reasoning_tokens_total` | Counter | provider, model |
-| `omp_llm_requests_total` | Counter | provider, model, status |
-| `omp_llm_reported_cost_usd_total` | Counter | provider, model |
-| `omp_llm_usage_missing_total` | Counter | provider, model |
+| Metric                            | Type    | Labels                     |
+| --------------------------------- | ------- | -------------------------- |
+| `omp_llm_tokens_total`            | Counter | provider, model, direction |
+| `omp_llm_reasoning_tokens_total`  | Counter | provider, model            |
+| `omp_llm_requests_total`          | Counter | provider, model, status    |
+| `omp_llm_reported_cost_usd_total` | Counter | provider, model            |
+| `omp_llm_usage_missing_total`     | Counter | provider, model            |
 
 Plus operational metrics: import errors, invalid records, last import timestamp.
 

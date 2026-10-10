@@ -35,6 +35,7 @@ A few points are inherent to how the plugin and exporter work and are not consid
   ```
 
   Versions up to `omp-usage@0.3.1` and `omp-usage-exporter@0.2.2` were published manually and have no provenance.
+
 - **GitHub Actions** are pinned to full commit SHAs; Dependabot updates them weekly, with a 7-day cooldown.
 - **Workflow inputs** are passed through environment variables and validated, never interpolated into shell scripts.
 - **CI** runs `npm audit --omit=dev`, `npm audit signatures`, dependency review on pull requests, CodeQL (`javascript-typescript` and `actions`) and OpenSSF Scorecard.
