@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0](https://github.com/tommasomarchionni/omp-usage/compare/omp-usage-v0.3.1...omp-usage-v1.0.0) (2026-10-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* plugin reliability, CI hardening, pricing and Grafana dashboards ([#30](https://github.com/tommasomarchionni/omp-usage/issues/30))
+
+### Features
+
+* **exporter:** --retention-days deletes only fully imported, idle files ([1d5fb85](https://github.com/tommasomarchionni/omp-usage/commit/1d5fb8579dd8e534e6db8fb322c0376066edcba3))
+* plugin reliability, CI hardening, pricing and Grafana dashboards ([#30](https://github.com/tommasomarchionni/omp-usage/issues/30)) ([1d5fb85](https://github.com/tommasomarchionni/omp-usage/commit/1d5fb8579dd8e534e6db8fb322c0376066edcba3))
+
 ## [0.3.1](https://github.com/tommasomarchionni/omp-usage/compare/omp-usage-v0.3.0...omp-usage-v0.3.1) (2026-10-10)
 
 
