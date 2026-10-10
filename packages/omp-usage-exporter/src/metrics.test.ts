@@ -1,61 +1,125 @@
-import { describe, it, expect } from "vitest";
-import { createAllMetrics, sanitizeLabel, updateLlmMetricsFromAggregates } from "./metrics.js";
-import type { AggregatedMetrics } from "./protocol.js";
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { join } from 'node:path';
+import { ExporterDatabase } from './database.js';
+import {
+  buildLabelMap,
+  createExporterState,
+  createMetrics,
+  normalizeLabelValue,
+  OVERFLOW_LABEL,
+} from './metrics.js';
+import type { FileCursor, UsageEvent } from './protocol.js';
+import { makeEvent, tempDir } from '../test/helpers.js';
 
-describe("sanitizeLabel", () => {
-  it("replaces invalid characters", () => {
-    expect(sanitizeLabel("provider/model")).toBe("provider_model");
-    expect(sanitizeLabel("model@1.0")).toBe("model_1_0");
-    expect(sanitizeLabel("normal-model")).toBe("normal_model");
-  });
-  it("truncates long labels", () => {
-    const long = "a".repeat(300);
-    expect(sanitizeLabel(long)).toHaveLength(256);
-  });
+const cursor: FileCursor = {
+  filePath: '/f',
+  offset: 1,
+  fileSize: 1,
+  inode: 1,
+  device: 1,
+  mtimeMs: 0,
+};
 
-  it("trims leading/trailing underscores", () => {
-    expect(sanitizeLabel("_test_")).toBe("test");
-    expect(sanitizeLabel("__test__")).toBe("test");
+function value(text: string, name: string, labels: Record<string, string>): number | undefined {
+  for (const l of text.split('\n')) {
+    if (!l.startsWith(name + '{')) continue;
+    if (Object.entries(labels).every(([k, v]) => l.includes(`${k}="${v}"`)))
+      return Number(l.split(' ').pop());
+  }
+  return undefined;
+}
+
+describe('normalizeLabelValue', () => {
+  it('keeps provider/model names verbatim (regression: values were mangled)', () => {
+    expect(normalizeLabelValue('openrouter/free')).toBe('openrouter/free');
+    expect(normalizeLabelValue('qwen3.6-35b-a3b:Q4_K_M')).toBe('qwen3.6-35b-a3b:Q4_K_M');
+  });
+  it('replaces control characters and truncates', () => {
+    expect(normalizeLabelValue('a\nb\u0000c')).toBe('a_b_c');
+    expect(normalizeLabelValue('x'.repeat(300))).toHaveLength(128);
   });
 });
 
-describe("createAllMetrics", () => {
-  it("creates registry with default metrics", () => {
-    const { registry, llm, operational } = createAllMetrics(1000);
-    expect(registry).toBeDefined();
-    expect(llm.tokensTotal).toBeDefined();
-    expect(llm.reasoningTokensTotal).toBeDefined();
-    expect(llm.requestsTotal).toBeDefined();
-    expect(llm.reportedCostUsdTotal).toBeDefined();
-    expect(llm.usageMissingTotal).toBeDefined();
-    expect(operational.importErrorsTotal).toBeDefined();
-    expect(operational.invalidRecordsTotal).toBeDefined();
-    expect(operational.lastImportTimestamp).toBeDefined();
-    expect(operational.labelCardinalityGauge).toBeDefined();
+describe('buildLabelMap', () => {
+  it('folds pairs beyond the cardinality limit into _other', () => {
+    const { map, exported, overflow } = buildLabelMap(
+      [
+        { provider: 'p1', model: 'm1' },
+        { provider: 'p2', model: 'm2' },
+        { provider: 'p3', model: 'm3' },
+      ],
+      2
+    );
+    expect(exported).toBe(2);
+    expect(overflow).toBe(1);
+    expect(map.get('p3\u0000m3')).toEqual({ provider: OVERFLOW_LABEL, model: OVERFLOW_LABEL });
   });
 });
 
-describe("updateLlmMetricsFromAggregates", () => {
-  it("updates metrics from aggregates", () => {
-    const { llm } = createAllMetrics(1000);
-    const aggregates: AggregatedMetrics[] = [
-      { provider: "openrouter", model: "openrouter/free", inputTokens: 1000, outputTokens: 500, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 50, requestsSuccess: 10, requestsError: 1, reportedCostUsd: 0.01, usageMissing: 0 },
-      { provider: "anthropic", model: "claude-3-opus", inputTokens: 2000, outputTokens: 1000, cacheReadTokens: 100, cacheWriteTokens: 50, reasoningTokens: 200, requestsSuccess: 5, requestsError: 0, reportedCostUsd: 0.05, usageMissing: 0 },
-    ];
-
-    const cardinality = updateLlmMetricsFromAggregates(llm, aggregates, 1000);
-    expect(cardinality).toBe(2);
+describe('createMetrics', () => {
+  let dir: ReturnType<typeof tempDir>;
+  let db: ExporterDatabase;
+  beforeEach(() => {
+    dir = tempDir();
+    db = new ExporterDatabase(join(dir.path, 'db.sqlite'));
+  });
+  afterEach(() => {
+    db.close();
+    dir.cleanup();
   });
 
-  it("aggregates excess into _other when over cardinality limit", () => {
-    const { llm } = createAllMetrics(2);
-    const aggregates: AggregatedMetrics[] = [
-      { provider: "p1", model: "m1", inputTokens: 100, outputTokens: 50, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, requestsSuccess: 1, requestsError: 0, reportedCostUsd: 0, usageMissing: 0 },
-      { provider: "p2", model: "m2", inputTokens: 200, outputTokens: 100, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, requestsSuccess: 1, requestsError: 0, reportedCostUsd: 0, usageMissing: 0 },
-      { provider: "p3", model: "m3", inputTokens: 300, outputTokens: 150, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, requestsSuccess: 1, requestsError: 0, reportedCostUsd: 0, usageMissing: 0 },
-    ];
+  it('exposes counters computed from the database at scrape time, idempotently', async () => {
+    const state = createExporterState();
+    const { registry } = createMetrics(db, state, {
+      maxLabelCardinality: 10,
+      version: '1.2.3',
+      collectProcessMetrics: false,
+    });
+    db.applyBatch({
+      events: [
+        makeEvent(),
+        makeEvent({ stopReason: 'error' }),
+        makeEvent({ usage: null }),
+      ] as UsageEvent[],
+      invalid: { invalid_json: 3 },
+      cursor,
+    });
 
-    const cardinality = updateLlmMetricsFromAggregates(llm, aggregates, 2);
-    expect(cardinality).toBe(2);
+    const first = await registry.metrics();
+    const second = await registry.metrics();
+    expect(second).toBe(first); // scraping twice never double counts
+
+    const l = { provider: 'openrouter', model: 'openrouter/free' };
+    expect(value(first, 'omp_llm_tokens_total', { ...l, direction: 'input' })).toBe(2 * 11351);
+    expect(value(first, 'omp_llm_tokens_total', { ...l, direction: 'output' })).toBe(2 * 83);
+    expect(value(first, 'omp_llm_reasoning_tokens_total', l)).toBe(142);
+    expect(value(first, 'omp_llm_requests_total', { ...l, status: 'success' })).toBe(2);
+    expect(value(first, 'omp_llm_requests_total', { ...l, status: 'error' })).toBe(1);
+    expect(value(first, 'omp_llm_stop_reasons_total', { ...l, stop_reason: 'stop' })).toBe(2);
+    expect(value(first, 'omp_llm_usage_missing_total', l)).toBe(1);
+    expect(value(first, 'omp_usage_invalid_records_total', { reason: 'invalid_json' })).toBe(3);
+    expect(first).toContain('omp_usage_build_info{version="1.2.3"');
+    // 0 until the first successful import, so "time() - x" alerts fire.
+    expect(first).toMatch(
+      /omp_usage_last_import_timestamp_seconds\{app="omp-usage-exporter"\} 0\n/
+    );
+
+    db.applyBatch({ events: [makeEvent()] as UsageEvent[], invalid: {}, cursor });
+    state.lastSuccessMs = 1_700_000_000_000;
+    const third = await registry.metrics();
+    expect(value(third, 'omp_llm_tokens_total', { ...l, direction: 'input' })).toBe(3 * 11351);
+    expect(third).toMatch(
+      /omp_usage_last_import_timestamp_seconds\{app="omp-usage-exporter"\} 1700000000/
+    );
+  });
+
+  it('does not throw when scraped after the database is closed', async () => {
+    const { registry } = createMetrics(db, createExporterState(), {
+      maxLabelCardinality: 10,
+      version: 'x',
+      collectProcessMetrics: false,
+    });
+    db.close();
+    await expect(registry.metrics()).resolves.toContain('omp_usage_build_info');
   });
 });
