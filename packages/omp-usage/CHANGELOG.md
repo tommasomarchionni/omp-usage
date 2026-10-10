@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/tommasomarchionni/omp-usage/compare/omp-usage-v0.3.0...omp-usage-v0.3.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* **plugin:** remove runtime protocol dependency for profile installs ([ca0e0e1](https://github.com/tommasomarchionni/omp-usage/commit/ca0e0e12dd47ae306e3cbf89ad905ea2f0c02ea2))
+
 ## [0.3.0](https://github.com/tommasomarchionni/omp-usage/compare/omp-usage-v0.2.1...omp-usage-v0.3.0) (2026-10-10)
 
 
