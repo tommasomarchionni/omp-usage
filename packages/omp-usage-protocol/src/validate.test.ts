@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from 'vitest';
 import {
   validateEvent,
   validateEvents,
@@ -9,19 +9,19 @@ import {
   validateUsageAccounting,
   type UsageEvent,
   type UsageEventInput,
-} from "./index.js";
+} from './index.js';
 
-describe("validateEvent", () => {
+describe('validateEvent', () => {
   const validEvent: UsageEvent = {
     schemaVersion: 1,
-    eventId: "550e8400-e29b-41d4-a716-446655440000",
-    sessionRunId: "660e8400-e29b-41d4-a716-446655440001",
-    timestamp: "2026-01-15T10:30:00.000Z",
-    eventType: "assistant_message_end",
-    provider: "openrouter",
-    model: "openrouter/free",
-    api: "openrouter",
-    stopReason: "stop",
+    eventId: '550e8400-e29b-41d4-a716-446655440000',
+    sessionRunId: '660e8400-e29b-41d4-a716-446655440001',
+    timestamp: '2026-01-15T10:30:00.000Z',
+    eventType: 'assistant_message_end',
+    provider: 'openrouter',
+    model: 'openrouter/free',
+    api: 'openrouter',
+    stopReason: 'stop',
     usage: {
       input: 1000,
       output: 500,
@@ -33,31 +33,31 @@ describe("validateEvent", () => {
     },
   };
 
-  it("returns valid result for valid event", () => {
+  it('returns valid result for valid event', () => {
     const result = validateEvent(validEvent);
     expect(result.valid).toBe(true);
     expect(result.event).toEqual(validEvent);
   });
 
-  it("returns errors for invalid event", () => {
-    const result = validateEvent({ ...validEvent, eventId: "invalid" });
+  it('returns errors for invalid event', () => {
+    const result = validateEvent({ ...validEvent, eventId: 'invalid' });
     expect(result.valid).toBe(false);
     expect(result.errors).toBeDefined();
     expect(result.errors!.length).toBeGreaterThan(0);
   });
 });
 
-describe("validateEvents", () => {
+describe('validateEvents', () => {
   const validEvent: UsageEvent = {
     schemaVersion: 1,
-    eventId: "550e8400-e29b-41d4-a716-446655440000",
-    sessionRunId: "660e8400-e29b-41d4-a716-446655440001",
-    timestamp: "2026-01-15T10:30:00.000Z",
-    eventType: "assistant_message_end",
-    provider: "openrouter",
-    model: "openrouter/free",
-    api: "openrouter",
-    stopReason: "stop",
+    eventId: '550e8400-e29b-41d4-a716-446655440000',
+    sessionRunId: '660e8400-e29b-41d4-a716-446655440001',
+    timestamp: '2026-01-15T10:30:00.000Z',
+    eventType: 'assistant_message_end',
+    provider: 'openrouter',
+    model: 'openrouter/free',
+    api: 'openrouter',
+    stopReason: 'stop',
     usage: {
       input: 1000,
       output: 500,
@@ -65,8 +65,8 @@ describe("validateEvents", () => {
     },
   };
 
-  it("separates valid and invalid events", () => {
-    const input = [validEvent, { ...validEvent, eventId: "invalid" }, validEvent];
+  it('separates valid and invalid events', () => {
+    const input = [validEvent, { ...validEvent, eventId: 'invalid' }, validEvent];
     const result = validateEvents(input);
     expect(result.valid).toHaveLength(2);
     expect(result.invalid).toHaveLength(1);
@@ -74,17 +74,17 @@ describe("validateEvents", () => {
   });
 });
 
-describe("validateJsonlLine", () => {
+describe('validateJsonlLine', () => {
   const validLine = JSON.stringify({
     schemaVersion: 1,
-    eventId: "550e8400-e29b-41d4-a716-446655440000",
-    sessionRunId: "660e8400-e29b-41d4-a716-446655440001",
-    timestamp: "2026-01-15T10:30:00.000Z",
-    eventType: "assistant_message_end",
-    provider: "openrouter",
-    model: "openrouter/free",
-    api: "openrouter",
-    stopReason: "stop",
+    eventId: '550e8400-e29b-41d4-a716-446655440000',
+    sessionRunId: '660e8400-e29b-41d4-a716-446655440001',
+    timestamp: '2026-01-15T10:30:00.000Z',
+    eventType: 'assistant_message_end',
+    provider: 'openrouter',
+    model: 'openrouter/free',
+    api: 'openrouter',
+    stopReason: 'stop',
     usage: {
       input: 1000,
       output: 500,
@@ -92,32 +92,32 @@ describe("validateJsonlLine", () => {
     },
   });
 
-  it("parses valid JSONL line", () => {
+  it('parses valid JSONL line', () => {
     const result = validateJsonlLine(validLine);
     expect(result.valid).toBe(true);
   });
 
-  it("rejects empty line", () => {
-    const result = validateJsonlLine("");
+  it('rejects empty line', () => {
+    const result = validateJsonlLine('');
     expect(result.valid).toBe(false);
-    expect(result.errors?.[0].code).toBe("empty_line");
+    expect(result.errors?.[0].code).toBe('empty_line');
   });
 
-  it("rejects invalid JSON", () => {
-    const result = validateJsonlLine("{ not valid json }");
+  it('rejects invalid JSON', () => {
+    const result = validateJsonlLine('{ not valid json }');
     expect(result.valid).toBe(false);
-    expect(result.errors?.[0].code).toBe("invalid_json");
+    expect(result.errors?.[0].code).toBe('invalid_json');
   });
 });
 
-describe("checkSchemaVersion", () => {
-  it("returns true for current schema version", () => {
+describe('checkSchemaVersion', () => {
+  it('returns true for current schema version', () => {
     const event: UsageEvent = {
       schemaVersion: 1,
-      eventId: "550e8400-e29b-41d4-a716-446655440000",
-      sessionRunId: "660e8400-e29b-41d4-a716-446655440001",
-      timestamp: "2026-01-15T10:30:00.000Z",
-      eventType: "assistant_message_end",
+      eventId: '550e8400-e29b-41d4-a716-446655440000',
+      sessionRunId: '660e8400-e29b-41d4-a716-446655440001',
+      timestamp: '2026-01-15T10:30:00.000Z',
+      eventType: 'assistant_message_end',
       provider: null,
       model: null,
       api: null,
@@ -127,14 +127,14 @@ describe("checkSchemaVersion", () => {
     expect(checkSchemaVersion(event)).toBe(true);
   });
 
-  it("returns false for different schema version", () => {
+  it('returns false for different schema version', () => {
     const event: UsageEvent = {
       ...{
         schemaVersion: 1,
-        eventId: "550e8400-e29b-41d4-a716-446655440000",
-        sessionRunId: "660e8400-e29b-41d4-a716-446655440001",
-        timestamp: "2026-01-15T10:30:00.000Z",
-        eventType: "assistant_message_end",
+        eventId: '550e8400-e29b-41d4-a716-446655440000',
+        sessionRunId: '660e8400-e29b-41d4-a716-446655440001',
+        timestamp: '2026-01-15T10:30:00.000Z',
+        eventType: 'assistant_message_end',
         provider: null,
         model: null,
         api: null,
@@ -147,18 +147,18 @@ describe("checkSchemaVersion", () => {
   });
 });
 
-describe("sanitizeForLog", () => {
-  it("returns event unchanged", () => {
+describe('sanitizeForLog', () => {
+  it('returns event unchanged', () => {
     const event: UsageEvent = {
       schemaVersion: 1,
-      eventId: "550e8400-e29b-41d4-a716-446655440000",
-      sessionRunId: "660e8400-e29b-41d4-a716-446655440001",
-      timestamp: "2026-01-15T10:30:00.000Z",
-      eventType: "assistant_message_end",
-      provider: "openrouter",
-      model: "openrouter/free",
-      api: "openrouter",
-      stopReason: "stop",
+      eventId: '550e8400-e29b-41d4-a716-446655440000',
+      sessionRunId: '660e8400-e29b-41d4-a716-446655440001',
+      timestamp: '2026-01-15T10:30:00.000Z',
+      eventType: 'assistant_message_end',
+      provider: 'openrouter',
+      model: 'openrouter/free',
+      api: 'openrouter',
+      stopReason: 'stop',
       usage: {
         input: 1000,
         output: 500,
@@ -169,14 +169,14 @@ describe("sanitizeForLog", () => {
   });
 });
 
-describe("createEvent", () => {
-  it("generates required fields", () => {
+describe('createEvent', () => {
+  it('generates required fields', () => {
     const input: UsageEventInput = {
-      eventType: "assistant_message_end",
-      provider: "openrouter",
-      model: "openrouter/free",
-      api: "openrouter",
-      stopReason: "stop",
+      eventType: 'assistant_message_end',
+      provider: 'openrouter',
+      model: 'openrouter/free',
+      api: 'openrouter',
+      stopReason: 'stop',
       usage: {
         input: 1000,
         output: 500,
@@ -190,23 +190,23 @@ describe("createEvent", () => {
     expect(event.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   });
 
-  it("uses provided timestamp", () => {
+  it('uses provided timestamp', () => {
     const input: UsageEventInput = {
-      eventType: "assistant_message_end",
-      provider: "openrouter",
-      model: "openrouter/free",
-      api: "openrouter",
-      stopReason: "stop",
+      eventType: 'assistant_message_end',
+      provider: 'openrouter',
+      model: 'openrouter/free',
+      api: 'openrouter',
+      stopReason: 'stop',
       usage: null,
-      timestamp: "2026-01-15T10:30:00.000Z",
+      timestamp: '2026-01-15T10:30:00.000Z',
     };
     const event = createEvent(input);
-    expect(event.timestamp).toBe("2026-01-15T10:30:00.000Z");
+    expect(event.timestamp).toBe('2026-01-15T10:30:00.000Z');
   });
 });
 
-describe("validateUsageAccounting", () => {
-  it("returns no warnings for valid usage", () => {
+describe('validateUsageAccounting', () => {
+  it('returns no warnings for valid usage', () => {
     const usage = {
       input: 1000,
       output: 500,
@@ -220,7 +220,7 @@ describe("validateUsageAccounting", () => {
     expect(warnings).toHaveLength(0);
   });
 
-  it("warns when reasoningTokens exceeds output", () => {
+  it('warns when reasoningTokens exceeds output', () => {
     const usage = {
       input: 1000,
       output: 100,
@@ -228,10 +228,12 @@ describe("validateUsageAccounting", () => {
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     };
     const warnings = validateUsageAccounting(usage);
-    expect(warnings.some((w) => w.includes("reasoningTokens") && w.includes("exceeds output"))).toBe(true);
+    expect(warnings.some(w => w.includes('reasoningTokens') && w.includes('exceeds output'))).toBe(
+      true
+    );
   });
 
-  it("warns when totalTokens less than sum of parts", () => {
+  it('warns when totalTokens less than sum of parts', () => {
     const usage = {
       input: 1000,
       output: 500,
@@ -241,40 +243,40 @@ describe("validateUsageAccounting", () => {
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     };
     const warnings = validateUsageAccounting(usage);
-    expect(warnings.some((w) => w.includes("totalTokens") && w.includes("less than sum"))).toBe(true);
+    expect(warnings.some(w => w.includes('totalTokens') && w.includes('less than sum'))).toBe(true);
   });
 
-  it("returns empty array for null usage", () => {
+  it('returns empty array for null usage', () => {
     expect(validateUsageAccounting(null)).toHaveLength(0);
   });
 
-  it("warns on negative values", () => {
+  it('warns on negative values', () => {
     const usage = {
       input: -100,
       output: 500,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     };
     const warnings = validateUsageAccounting(usage);
-    expect(warnings.some((w) => w.includes("usage.input"))).toBe(true);
+    expect(warnings.some(w => w.includes('usage.input'))).toBe(true);
   });
 
-  it("warns on NaN values", () => {
+  it('warns on NaN values', () => {
     const usage = {
       input: NaN,
       output: 500,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     };
     const warnings = validateUsageAccounting(usage);
-    expect(warnings.some((w) => w.includes("usage.input"))).toBe(true);
+    expect(warnings.some(w => w.includes('usage.input'))).toBe(true);
   });
 
-  it("warns on Infinity", () => {
+  it('warns on Infinity', () => {
     const usage = {
       input: Infinity,
       output: 500,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     };
     const warnings = validateUsageAccounting(usage);
-    expect(warnings.some((w) => w.includes("usage.input"))).toBe(true);
+    expect(warnings.some(w => w.includes('usage.input'))).toBe(true);
   });
 });

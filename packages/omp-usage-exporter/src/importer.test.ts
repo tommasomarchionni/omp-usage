@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   appendFileSync,
+  existsSync,
   mkdirSync,
   renameSync,
   rmSync,
   symlinkSync,
   truncateSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -209,5 +211,48 @@ describe('Importer', () => {
     // Cursor always points exactly after the last committed line.
     expect(offset).toBe(Buffer.byteLength(lines.slice(0, count).join('')));
     expect(count % 10).toBe(0);
+  });
+
+  describe('pruneImported (exporter-side retention)', () => {
+    const old = (p: string, days: number) => {
+      const t = (Date.now() - days * 86_400_000) / 1000;
+      utimesSync(p, t, t);
+    };
+
+    it('deletes only fully imported files older than the retention', async () => {
+      writeFileSync(file('done.jsonl'), line(makeEvent()));
+      writeFileSync(file('recent.jsonl'), line(makeEvent()));
+      await importer.importAll();
+      old(file('done.jsonl'), 10);
+
+      const deleted = importer.pruneImported(7);
+      expect(deleted).toEqual([file('done.jsonl')]);
+      expect(existsSync(file('done.jsonl'))).toBe(false);
+      expect(existsSync(file('recent.jsonl'))).toBe(true);
+      expect(db.getCursor(file('done.jsonl'))).toBeNull();
+      expect(db.countEvents()).toBe(2); // events are kept
+    });
+
+    it('never deletes a file with unimported data', async () => {
+      writeFileSync(file(), line(makeEvent()));
+      await importer.importAll();
+      appendFileSync(file(), line(makeEvent())); // not imported yet
+      old(file(), 30);
+      expect(importer.pruneImported(7)).toEqual([]);
+
+      writeFileSync(file('never.jsonl'), line(makeEvent())); // no cursor at all
+      old(file('never.jsonl'), 30);
+      expect(importer.pruneImported(7)).toEqual([]);
+    });
+
+    it('never deletes a file that was replaced after import', async () => {
+      writeFileSync(file(), line(makeEvent()));
+      await importer.importAll();
+      const tmp = file('x.tmp');
+      writeFileSync(tmp, line(makeEvent()));
+      renameSync(tmp, file());
+      old(file(), 30);
+      expect(importer.pruneImported(7)).toEqual([]);
+    });
   });
 });

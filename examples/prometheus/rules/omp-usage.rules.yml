@@ -1,0 +1,32 @@
+# Recording rules: cheaper long-range panels and alerts.
+# Optional; the dashboards query the raw series and do not need them.
+groups:
+  - name: omp-usage-recording
+    interval: 1m
+    rules:
+      - record: provider_model_direction:omp_llm_tokens:rate5m
+        expr: sum by (job, provider, model, direction) (rate(omp_llm_tokens_total[5m]))
+
+      - record: provider_model_status:omp_llm_requests:rate5m
+        expr: sum by (job, provider, model, status) (rate(omp_llm_requests_total[5m]))
+
+      - record: provider_model:omp_llm_reported_cost_usd:rate5m
+        expr: sum by (job, provider, model) (rate(omp_llm_reported_cost_usd_total[5m]))
+
+      # Equivalent cost rate from --pricing-file prices (USD per second).
+      - record: provider_model:omp_llm_equivalent_cost_usd:rate5m
+        expr: |
+          sum by (job, provider, model) (
+            rate(omp_llm_tokens_total[5m])
+            * on (job, provider, model, direction) group_left
+            max by (job, provider, model, direction) (omp_llm_price_usd_per_million_tokens)
+          ) / 1e6
+
+      - record: job:omp_llm_reported_cost_usd:increase1d
+        expr: sum by (job) (increase(omp_llm_reported_cost_usd_total[1d]))
+
+      - record: job:omp_llm_error_ratio:rate30m
+        expr: |
+          sum by (job) (rate(omp_llm_requests_total{status="error"}[30m]))
+          /
+          sum by (job) (rate(omp_llm_requests_total[30m]))

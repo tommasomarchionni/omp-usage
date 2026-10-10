@@ -7,6 +7,7 @@ import {
   readSync,
   readdirSync,
   realpathSync,
+  unlinkSync,
 } from 'node:fs';
 import type { Stats } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -131,6 +132,41 @@ export class Importer extends EventEmitter<ImporterEvents> {
       .filter(name => name.endsWith('.jsonl'))
       .sort()
       .map(name => join(dir, name));
+  }
+
+  /**
+   * Deletes event files that are **fully imported** and have not been
+   * modified for `retentionDays`. A file is deleted only if its stored cursor
+   * matches the current inode/device and points at the current end of file,
+   * so data that was not imported yet is never lost. Returns deleted paths.
+   */
+  pruneImported(retentionDays: number, now = Date.now()): string[] {
+    const cutoff = now - retentionDays * 24 * 60 * 60 * 1000;
+    const deleted: string[] = [];
+    for (const filePath of this.listEventFiles()) {
+      if (this.stopping) break;
+      try {
+        const st = lstatSync(filePath);
+        if (!st.isFile() || st.mtimeMs >= cutoff) continue;
+        const cursor = this.db.getCursor(filePath);
+        if (
+          !cursor ||
+          cursor.inode !== Number(st.ino) ||
+          cursor.device !== Number(st.dev) ||
+          cursor.offset !== st.size
+        ) {
+          continue;
+        }
+        unlinkSync(filePath);
+        this.db.deleteCursor(filePath);
+        deleted.push(filePath);
+      } catch (e) {
+        if (!isErrno(e, 'ENOENT')) {
+          this.emit('error', e instanceof Error ? e : new Error(String(e)), filePath);
+        }
+      }
+    }
+    return deleted;
   }
 
   private async runCycle(): Promise<ImportCycleResult> {

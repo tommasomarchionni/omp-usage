@@ -19,6 +19,12 @@ export interface ResolvedConfig {
   shutdownTimeoutMs: number;
   /** /healthz reports unhealthy if no import succeeded for this long. */
   staleAfterMs: number;
+  /** Delete fully imported files idle for this many days; null = never. */
+  retentionDays: number | null;
+  /** Optional JSON price tables for equivalent-cost dashboards; null = disabled. */
+  pricingFile: string | null;
+  /** Default location of the cached OpenRouter catalog. */
+  pricingCacheFile: string;
 }
 
 export const DEFAULTS = {
@@ -39,6 +45,8 @@ export interface ConfigFlags {
   maxLabelCardinality?: number | string;
   pollIntervalMs?: number | string;
   shutdownTimeoutMs?: number | string;
+  retentionDays?: number | string;
+  pricingFile?: string;
 }
 
 export class ConfigError extends Error {
@@ -131,9 +139,22 @@ export function resolveConfig(
       DEFAULTS.shutdownTimeoutMs
     ),
     staleAfterMs: Math.max(3 * pollIntervalMs, 60_000),
+    retentionDays: parseRetention(
+      pick(flags.retentionDays, 'OMP_USAGE_EXPORTER_RETENTION_DAYS', env)
+    ),
+    pricingFile: ((v?: string) => (v ? expandPath(v) : null))(
+      pick(flags.pricingFile, 'OMP_USAGE_PRICING_FILE', env)
+    ),
+    pricingCacheFile: join(stateDir, 'openrouter-models.json'),
   };
   validateConfig(config);
   return config;
+}
+
+function parseRetention(v: number | string | undefined): number | null {
+  if (v === undefined) return null;
+  if (typeof v === 'string' && ['off', 'none', '0'].includes(v.trim().toLowerCase())) return null;
+  return parsePositiveInt('retentionDays', v);
 }
 
 export function expandPath(path: string): string {

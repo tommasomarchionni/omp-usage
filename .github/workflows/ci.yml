@@ -9,120 +9,154 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint:
-    name: Lint
+    name: Lint & TypeCheck
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: "22"
-          cache: "npm"
-      - name: Install dependencies
-        run: npm ci
-      - name: Run ESLint
-        run: npm run lint
-
-  typecheck:
-    name: TypeCheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: "22"
-          cache: "npm"
-      - name: Install dependencies
-        run: npm ci
-      - name: Run TypeScript typecheck
-        run: npm run typecheck
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
 
   test:
-    name: Test
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }}, Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: ['22', '24']
     steps:
-      - uses: actions/checkout@v7
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: "22"
-          cache: "npm"
-      - name: Install dependencies
-        run: npm ci
-      - name: Build
-        run: npm run build
-      - name: Run tests
-        run: npm run test
-      - name: Run integration tests
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Unit tests
+        run: npm test
+      - name: Integration tests (real processes, signals, SQLite)
         run: npm run test:integration
 
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    needs: [lint, typecheck, test]
-    steps:
-      - uses: actions/checkout@v7
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          cache: "npm"
-      - name: Install dependencies
-        run: npm ci
-      - name: Build all packages
-        run: npm run build
-      - name: Verify dist outputs
-        run: |
-          test -f packages/omp-usage/dist/index.js
-          test -f packages/omp-usage/dist/index.d.ts
-          test -x packages/omp-usage-exporter/dist/cli.js
-          node packages/omp-usage-exporter/dist/cli.js --version
-          # The internal protocol package must be bundled, never imported at runtime
-          ! grep -qE "(from|import\()[[:space:]]*['\"]@tommasomarchionni/omp-usage-protocol" packages/omp-usage-exporter/dist/cli.js
-
   package-smoke:
-    name: Package Smoke Test
-    runs-on: ubuntu-latest
-    needs: [build]
+    name: Package smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: [test]
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v7
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: "22"
-          cache: "npm"
-      - name: Install dependencies
-        run: npm ci
-      - name: Build
-        run: npm run build
-      - name: Pack plugin
-        run: npm pack --workspaces --ignore-scripts
-      - name: Install plugin tarball
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Pack publishable packages
         run: |
-          cd packages/omp-usage
-          npm pack
-          # Verify package.json exports
-          node -e "const pkg = require('./package.json'); console.log('exports:', Object.keys(pkg.exports || {}));"
-      - name: Install exporter tarball
+          mkdir -p "$RUNNER_TEMP/pkgs"
+          npm pack --workspace @tommasomarchionni/omp-usage --pack-destination "$RUNNER_TEMP/pkgs"
+          npm pack --workspace @tommasomarchionni/omp-usage-exporter --pack-destination "$RUNNER_TEMP/pkgs"
+          ls -l "$RUNNER_TEMP/pkgs"
+      - name: Install tarballs in a clean project and run them
+        working-directory: ${{ runner.temp }}
         run: |
-          cd packages/omp-usage-exporter
-          npm pack
-          node -e "const pkg = require('./package.json'); console.log('bin:', pkg.bin); console.log('exports:', Object.keys(pkg.exports || {}));"
+          set -euo pipefail
+          mkdir app && cd app
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund ../pkgs/*.tgz
+
+          # The internal protocol workspace must not be required at runtime.
+          # Only emitted JavaScript counts: source maps embed the original sources.
+          if grep -rqE --include='*.js' --include='*.mjs' --include='*.cjs' \
+            "(from|import|require)\s*\(?\s*['\"]@tommasomarchionni/omp-usage-protocol" \
+            node_modules/@tommasomarchionni/*/dist; then
+            echo "::error::a published package imports the internal protocol workspace"
+            exit 1
+          fi
+
+          npx omp-usage-exporter --version
+          npx omp-usage-exporter --help >/dev/null
+
+          # Plugin writes an event through a fake OMP API, exporter imports it
+          export OMP_USAGE_EVENTS_DIR="$PWD/events"
+          node --input-type=module -e "
+            const { default: factory } = await import('@tommasomarchionni/omp-usage');
+            const h = {};
+            factory({ on: (e, fn) => (h[e] = fn) });
+            h.message_end({ message: { role: 'assistant', provider: 'openrouter', model: 'openrouter/free',
+              stopReason: 'stop', usage: { input: 10, output: 2 } } });
+            await h.session_shutdown();
+          "
+          npx omp-usage-exporter --db-path "$PWD/db.sqlite" --import-once 2>&1 | tee import.log
+          grep -q "imported=1 " import.log
+
+  audit:
+    name: npm audit (production dependencies)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: .nvmrc
+      - run: npm audit --omit=dev --audit-level=high
+      - name: Verify registry signatures and provenance of installed packages
+        run: npm ci --ignore-scripts && npm audit signatures
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
 
   docs:
-    name: Docs Build
+    name: Docs build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - name: Setup Python
-        uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: "3.x"
-      - name: Install mkdocs
-        run: pip install mkdocs-material
-      - name: Build docs
-        run: mkdocs build -f docs/mkdocs.yml --strict
-        # docs/mkdocs.yml will be created in docs phase
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+      - run: pip install -r docs/requirements.txt
+      - run: mkdocs build -f docs/mkdocs.yml --strict

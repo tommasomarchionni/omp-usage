@@ -7,6 +7,7 @@
 **Symptoms**: Events directory is empty or not created.
 
 **Checks**:
+
 1. Plugin loaded in OMP:
    ```
    # Check OMP logs for:
@@ -28,6 +29,7 @@
    ```
 
 **Common causes**:
+
 - Plugin not in OMP config `extensions` array
 - OMP version too old (hooks not available)
 - Directory permissions prevent write
@@ -46,10 +48,12 @@
 **Symptoms**: OMP process memory grows.
 
 **Causes**:
+
 - Event queue filling up (slow disk, high event rate)
 - Large events (very long responses)
 
 **Fixes**:
+
 ```json
 {
   "omp": {
@@ -75,6 +79,7 @@
 ### Exporter won't start
 
 **Check**:
+
 ```bash
 # Config validation
 omp-usage-exporter --config-check
@@ -87,6 +92,7 @@ node -e "require('better-sqlite3'); require('@prometheus-io/client'); console.lo
 ```
 
 **Common errors**:
+
 - `better-sqlite3` not compiled: Run `npm rebuild better-sqlite3`
 - Port in use: Change `OMP_USAGE_LISTEN` or kill existing process
 - Database locked: Another exporter instance running
@@ -103,6 +109,7 @@ lsof ~/.local/state/omp-usage/exporter.db
 **Symptoms**: `/metrics` shows no data or stale data.
 
 **Checks**:
+
 1. Health endpoint:
    ```bash
    curl http://127.0.0.1:9464/healthz
@@ -118,6 +125,7 @@ lsof ~/.local/state/omp-usage/exporter.db
    ```
 
 **Common causes**:
+
 - Events directory path mismatch (plugin vs exporter)
 - Files not `*.jsonl` extension
 - Malformed JSONL lines (check with `head -n 1 file.jsonl | jq .`)
@@ -127,6 +135,7 @@ lsof ~/.local/state/omp-usage/exporter.db
 **Cause**: Label cardinality limit reached (default 1000).
 
 **Check**:
+
 ```bash
 curl -s http://127.0.0.1:9464/metrics | grep omp_usage_label_cardinality
 ```
@@ -136,11 +145,13 @@ curl -s http://127.0.0.1:9464/metrics | grep omp_usage_label_cardinality
 ### High CPU / memory
 
 **Causes**:
+
 - Very large events directory (many files)
 - Frequent imports (default scans every 1s)
 - Large `maxLineLength`
 
 **Fixes**:
+
 - Increase import interval (not directly configurable, but can reduce scan frequency by moving old files)
 - Reduce `maxLineLength` if lines are small
 - Archive old event files
@@ -150,6 +161,7 @@ curl -s http://127.0.0.1:9464/metrics | grep omp_usage_label_cardinality
 ### Target DOWN
 
 **Checks**:
+
 1. Exporter running: `curl http://host:9464/healthz`
 2. Network: `telnet host 9464`
 3. Prometheus config: `promtool check config prometheus.yml`
@@ -157,6 +169,7 @@ curl -s http://127.0.0.1:9464/metrics | grep omp_usage_label_cardinality
 ### No metrics in Prometheus
 
 **Checks**:
+
 1. Scrape interval > 0
 2. Metrics path correct (`/metrics`)
 3. Target labels match
@@ -166,19 +179,20 @@ curl -s http://127.0.0.1:9464/metrics | grep omp_usage_label_cardinality
 **Cause**: Too many unique (provider, model) pairs.
 
 **Fixes**:
+
 - Increase exporter `maxLabelCardinality`
 - Use recording rules to pre-aggregate
 - Drop high-cardinality labels in Prometheus relabeling
 
 ## Common Error Messages
 
-| Error | Meaning | Fix |
-|-------|---------|-----|
-| `EACCES: permission denied` | Can't write events dir | Fix directory permissions |
-| `SQLITE_BUSY: database is locked` | Another process using DB | Ensure single exporter instance |
-| `ENOENT: no such file or directory` | Events dir doesn't exist | Create dir or fix path |
-| `Line too long` | JSONL line exceeds limit | Increase `maxLineLength` |
-| `Unknown schema version` | Event has unsupported version | Check plugin/exporter version match |
+| Error                               | Meaning                       | Fix                                 |
+| ----------------------------------- | ----------------------------- | ----------------------------------- |
+| `EACCES: permission denied`         | Can't write events dir        | Fix directory permissions           |
+| `SQLITE_BUSY: database is locked`   | Another process using DB      | Ensure single exporter instance     |
+| `ENOENT: no such file or directory` | Events dir doesn't exist      | Create dir or fix path              |
+| `Line too long`                     | JSONL line exceeds limit      | Increase `maxLineLength`            |
+| `Unknown schema version`            | Event has unsupported version | Check plugin/exporter version match |
 
 ## Getting Help
 

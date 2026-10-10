@@ -3,7 +3,7 @@
  * These are the TypeScript types used across plugin and exporter.
  */
 
-import type { UsageEvent, UsageEventInput } from "./schema.js";
+import type { UsageEvent, UsageEventInput } from './schema.js';
 
 export type { UsageEvent, UsageEventInput };
 
@@ -27,7 +27,7 @@ export interface WriterConfig {
  * Default writer configuration.
  */
 export const DEFAULT_WRITER_CONFIG: WriterConfig = {
-  eventsDir: "",
+  eventsDir: '',
   maxQueueSize: 1000,
   flushIntervalMs: 1000,
   fileMode: 0o600,
@@ -47,7 +47,7 @@ export interface ExporterConfig {
   /** Maximum line length when reading JSONL */
   maxLineLength: number;
   /** Log level */
-  logLevel: "debug" | "info" | "warn" | "error";
+  logLevel: 'debug' | 'info' | 'warn' | 'error';
   /** Maximum unique (provider, model) pairs for metrics cardinality */
   maxLabelCardinality: number;
 }
@@ -56,11 +56,11 @@ export interface ExporterConfig {
  * Default exporter configuration.
  */
 export const DEFAULT_EXPORTER_CONFIG: ExporterConfig = {
-  eventsDir: "",
-  dbPath: "",
-  listen: "127.0.0.1:9464",
+  eventsDir: '',
+  dbPath: '',
+  listen: '127.0.0.1:9464',
   maxLineLength: 1048576, // 1 MiB
-  logLevel: "info",
+  logLevel: 'info',
   maxLabelCardinality: 1000,
 };
 
@@ -134,12 +134,12 @@ export interface LlmMetricLabels {
  * Prometheus metric labels for request metrics.
  */
 export interface RequestMetricLabels extends LlmMetricLabels {
-  status: "success" | "error";
+  status: 'success' | 'error';
 }
 
 /**
  * Prometheus metric labels for token metrics.
  */
 export interface TokenMetricLabels extends LlmMetricLabels {
-  direction: "input" | "output" | "cache_read" | "cache_write";
+  direction: 'input' | 'output' | 'cache_read' | 'cache_write';
 }

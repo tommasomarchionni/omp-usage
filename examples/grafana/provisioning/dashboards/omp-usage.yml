@@ -1,0 +1,16 @@
+# Grafana dashboard provisioning: loads every JSON in the mounted directory
+# into the folder "OMP usage". Mount examples/grafana/dashboards at
+# /var/lib/grafana/dashboards/omp-usage (see docs/grafana.md).
+apiVersion: 1
+providers:
+  - name: omp-usage
+    orgId: 1
+    folder: OMP usage
+    folderUid: omp-usage
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 60
+    options:
+      path: /var/lib/grafana/dashboards/omp-usage
+      foldersFromFilesStructure: false

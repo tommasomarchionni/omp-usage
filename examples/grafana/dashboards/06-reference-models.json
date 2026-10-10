@@ -1,0 +1,717 @@
+{
+  "uid": "omp-usage-references",
+  "title": "OMP usage / Reference model comparison",
+  "description": "What the same usage would cost on reference models (Claude, GPT, Qwen, ...).",
+  "tags": [
+    "omp-usage"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "1m",
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "1h"
+    ]
+  },
+  "fiscalYearStartMonth": 0,
+  "liveNow": false,
+  "links": [
+    {
+      "title": "OMP usage",
+      "type": "dashboards",
+      "tags": [
+        "omp-usage"
+      ],
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true,
+      "icon": "external link"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "datasource",
+        "label": "Data source",
+        "query": "prometheus",
+        "current": {
+          "text": "Prometheus",
+          "value": "prometheus"
+        },
+        "hide": 0,
+        "refresh": 1,
+        "regex": "",
+        "options": []
+      },
+      {
+        "type": "query",
+        "name": "job",
+        "label": "Job",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(omp_usage_build_info, job)",
+        "query": {
+          "query": "label_values(omp_usage_build_info, job)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "multi": false,
+        "includeAll": false,
+        "sort": 1,
+        "hide": 0,
+        "regex": "",
+        "options": [],
+        "current": {
+          "text": "omp_usage",
+          "value": "omp_usage"
+        }
+      },
+      {
+        "type": "query",
+        "name": "provider",
+        "label": "Provider",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(omp_llm_tokens_total{job=~\"$job\"}, provider)",
+        "query": {
+          "query": "label_values(omp_llm_tokens_total{job=~\"$job\"}, provider)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "sort": 1,
+        "hide": 0,
+        "regex": "",
+        "options": [],
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "type": "query",
+        "name": "model",
+        "label": "Model",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(omp_llm_tokens_total{job=~\"$job\", provider=~\"$provider\"}, model)",
+        "query": {
+          "query": "label_values(omp_llm_tokens_total{job=~\"$job\", provider=~\"$provider\"}, model)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "sort": 1,
+        "hide": 0,
+        "regex": "",
+        "options": [],
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "type": "interval",
+        "name": "bucket",
+        "label": "Bucket",
+        "query": "1h,3h,6h,12h,1d,7d,30d",
+        "auto": false,
+        "auto_count": 30,
+        "auto_min": "1h",
+        "refresh": 2,
+        "hide": 0,
+        "current": {
+          "text": "1d",
+          "value": "1d"
+        },
+        "options": [
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          },
+          {
+            "text": "3h",
+            "value": "3h",
+            "selected": false
+          },
+          {
+            "text": "6h",
+            "value": "6h",
+            "selected": false
+          },
+          {
+            "text": "12h",
+            "value": "12h",
+            "selected": false
+          },
+          {
+            "text": "1d",
+            "value": "1d",
+            "selected": true
+          },
+          {
+            "text": "7d",
+            "value": "7d",
+            "selected": false
+          },
+          {
+            "text": "30d",
+            "value": "30d",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "type": "query",
+        "name": "reference",
+        "label": "Reference model",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(omp_llm_reference_price_usd_per_million_tokens{job=~\"$job\"}, reference_model)",
+        "query": {
+          "query": "label_values(omp_llm_reference_price_usd_per_million_tokens{job=~\"$job\"}, reference_model)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "sort": 1,
+        "hide": 0,
+        "regex": "",
+        "options": [],
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "About",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Prices **all** selected usage (any provider) at the price of each reference model from the `references` list of the pricing file. Token counts come from the original models' tokenizers, so this is an estimate, not a quote."
+      },
+      "id": 1
+    },
+    {
+      "type": "bargauge",
+      "title": "Cost of the selected usage at each reference model",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (reference_model) (\n  sum by (direction) (increase(omp_llm_tokens_total{job=~\"$job\", provider=~\"$provider\", model=~\"$model\"}[$__range]))\n  * on (direction) group_right\n  max by (reference_model, direction) (omp_llm_reference_price_usd_per_million_tokens{job=~\"$job\", reference_model=~\"$reference\"})\n) / 1e6",
+          "legendFormat": "{{reference_model}}",
+          "refId": "A",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "auto",
+        "sizing": "auto",
+        "minVizHeight": 16,
+        "maxVizHeight": 300,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "id": 2
+    },
+    {
+      "type": "bargauge",
+      "title": "Compared with what you paid",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 3,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (reference_model) (\n  sum by (direction) (increase(omp_llm_tokens_total{job=~\"$job\", provider=~\"$provider\", model=~\"$model\"}[$__range]))\n  * on (direction) group_right\n  max by (reference_model, direction) (omp_llm_reference_price_usd_per_million_tokens{job=~\"$job\", reference_model=~\"$reference\"})\n) / 1e6",
+          "legendFormat": "{{reference_model}}",
+          "refId": "A",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(omp_llm_reported_cost_usd_total{job=~\"$job\", provider=~\"$provider\", model=~\"$model\"}[$__range]))",
+          "legendFormat": "reported (actual)",
+          "refId": "B",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum((\n  (sum by (provider, model) (increase(omp_llm_reported_cost_usd_total{job=~\"$job\", provider=~\"$provider\", model=~\"$model\"}[$__range]))) > 0\n)\nor\n(\n  sum by (provider, model) (\n  increase(omp_llm_tokens_total{job=~\"$job\", provider=~\"$provider\", model=~\"$model\"}[$__range])\n  * on (provider, model, direction) group_left\n  max by (provider, model, direction) (omp_llm_price_usd_per_million_tokens{job=~\"$job\"})\n) / 1e6\n))",
+          "legendFormat": "effective (reported or equivalent)",
+          "refId": "C",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "auto",
+        "sizing": "auto",
+        "minVizHeight": 16,
+        "maxVizHeight": 300,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "id": 3
+    },
+    {
+      "type": "timeseries",
+      "title": "Reference cost per bucket",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (reference_model) (\n  sum by (direction) (increase(omp_llm_tokens_total{job=~\"$job\", provider=~\"$provider\", model=~\"$model\"}[$__interval]))\n  * on (direction) group_right\n  max by (reference_model, direction) (omp_llm_reference_price_usd_per_million_tokens{job=~\"$job\", reference_model=~\"$reference\"})\n) / 1e6",
+          "legendFormat": "{{reference_model}}",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "barAlignment": -1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "gradientMode": "none",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "interval": "$bucket",
+      "id": 4
+    },
+    {
+      "type": "bargauge",
+      "title": "Usage priced at $reference, by model",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (provider, model) (\n  increase(omp_llm_tokens_total{job=~\"$job\", provider=~\"$provider\", model=~\"$model\"}[$__range])\n  * on (direction) group_left\n  max by (direction) (omp_llm_reference_price_usd_per_million_tokens{job=~\"$job\", reference_model=\"$reference\"})\n) / 1e6",
+          "legendFormat": "{{provider}} / {{model}}",
+          "refId": "A",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "auto",
+        "sizing": "auto",
+        "minVizHeight": 16,
+        "maxVizHeight": 300,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "repeat": "reference",
+      "repeatDirection": "h",
+      "maxPerRow": 2,
+      "id": 5
+    },
+    {
+      "type": "table",
+      "title": "Reference prices (USD per 1M tokens)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "max by (reference_model) (omp_llm_reference_price_usd_per_million_tokens{job=~\"$job\", reference_model=~\"$reference\", direction=\"input\"})",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "max by (reference_model) (omp_llm_reference_price_usd_per_million_tokens{job=~\"$job\", reference_model=~\"$reference\", direction=\"output\"})",
+          "legendFormat": "__auto",
+          "refId": "B",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "max by (reference_model) (omp_llm_reference_price_usd_per_million_tokens{job=~\"$job\", reference_model=~\"$reference\", direction=\"cache_read\"})",
+          "legendFormat": "__auto",
+          "refId": "C",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "max by (reference_model) (omp_llm_reference_price_usd_per_million_tokens{job=~\"$job\", reference_model=~\"$reference\", direction=\"cache_write\"})",
+          "legendFormat": "__auto",
+          "refId": "D",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Input"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Output"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache read"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache write"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": ""
+        }
+      },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "job": true,
+              "instance": true,
+              "app": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "Value #A": "Input",
+              "Value #B": "Output",
+              "Value #C": "Cache read",
+              "Value #D": "Cache write"
+            }
+          }
+        }
+      ],
+      "id": 6
+    }
+  ]
+}

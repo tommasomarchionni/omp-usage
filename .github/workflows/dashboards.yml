@@ -1,0 +1,60 @@
+name: Dashboards
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - examples/grafana/**
+      - examples/prometheus/**
+      - .github/workflows/dashboards.yml
+  pull_request:
+    paths:
+      - examples/grafana/**
+      - examples/prometheus/**
+      - .github/workflows/dashboards.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dashboards-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PROMETHEUS_VERSION: 3.15.0
+  PROMETHEUS_SHA256: 2a542df32eac02ee17b9d844fb2aa1de00dafa5476579ba8a3ba862e9d572ea0
+  GRAFANA_IMAGE: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
+
+jobs:
+  validate:
+    name: Rules & dashboards
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Dashboards are up to date with generate.py
+        run: python3 examples/grafana/generate.py --check
+
+      - name: Download Prometheus
+        run: |
+          f="prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$f" "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/$f"
+          echo "${PROMETHEUS_SHA256}  $RUNNER_TEMP/$f" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$f" -C "$RUNNER_TEMP"
+          echo "PROMETHEUS_DIR=$RUNNER_TEMP/prometheus-${PROMETHEUS_VERSION}.linux-amd64" >> "$GITHUB_ENV"
+
+      - name: promtool check
+        run: |
+          "$PROMETHEUS_DIR/promtool" check config examples/prometheus/prometheus.yml
+          "$PROMETHEUS_DIR/promtool" check rules examples/prometheus/rules/*.yml
+          "$PROMETHEUS_DIR/promtool" test rules examples/prometheus/tests/*.yml
+
+      - name: Every panel returns data (Prometheus + Grafana)
+        run: examples/grafana/validate/run.sh

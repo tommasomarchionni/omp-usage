@@ -49,73 +49,26 @@ scrape_configs:
         replacement: '${1}'
 ```
 
-## Recording Rules (Optional)
+## Example configuration, rules and alerts
 
-Pre-compute common queries:
+[`examples/prometheus/`](https://github.com/tommasomarchionni/omp-usage/tree/main/examples/prometheus)
+contains files that CI checks with `promtool`:
 
-```yaml
-# rules/omp_usage.yml
-groups:
-  - name: omp_usage
-    interval: 1m
-    rules:
-      - expr: sum by (provider) (rate(omp_llm_tokens_total[5m]))
-        record: omp_usage:tokens_per_provider_per_second
-      - expr: sum by (provider, model) (rate(omp_llm_requests_total[5m]))
-        record: omp_usage:requests_per_model_per_second
-      - expr: sum by (provider, model) (rate(omp_llm_reported_cost_usd_total[1h]))
-        record: omp_usage:cost_per_model_per_hour
+| File                         | Content                                                                                                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prometheus.yml`             | Scrape config for job `omp_usage` and the existing llama.cpp job `llm` (example address).                                                                             |
+| `rules/omp-usage.rules.yml`  | Optional recording rules: token, request, reported cost and equivalent cost rates, daily cost, error ratio.                                                           |
+| `rules/omp-usage.alerts.yml` | Alerts: exporter down, import stale or failing, invalid records, label overflow, unresolved prices, stale price catalog, high error rate, daily spend, usage missing. |
+| `tests/omp-usage.test.yml`   | `promtool test rules` unit tests for the alerts and the equivalent cost rule.                                                                                         |
+
+```bash
+promtool check rules examples/prometheus/rules/*.yml
+promtool test rules examples/prometheus/tests/omp-usage.test.yml
 ```
 
-Include in `prometheus.yml`:
-```yaml
-rule_files:
-  - "rules/omp_usage.yml"
-```
-
-## Alerting Rules (Optional)
-
-```yaml
-# alerts/omp_usage.yml
-groups:
-  - name: omp_usage
-    rules:
-      - alert: OMPUsageExporterDown
-        expr: up{job="omp_usage"} == 0
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: "OMP Usage Exporter down"
-          description: "Exporter {{ $labels.instance }} has been down for 2 minutes"
-
-      - alert: OMPUsageImportErrors
-        expr: increase(omp_usage_import_errors_total[5m]) > 10
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High import error rate"
-          description: "{{ $value }} import errors in last 5 minutes"
-
-      - alert: OMPUsageLabelCardinalityHigh
-        expr: omp_usage_label_cardinality > 800
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Label cardinality approaching limit"
-          description: "Current cardinality: {{ $value }} (limit: 1000)"
-
-      - alert: OMPUsageNoRecentImport
-        expr: time() - omp_usage_last_import_timestamp_seconds > 300
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "No recent import"
-          description: "Last import was {{ $value | humanizeDuration }} ago"
-```
+Thresholds are starting points. `OmpLlmDailySpendHigh` uses 20 USD per day:
+change it to your budget. The Grafana dashboards do not need the recording
+rules; see [Grafana](grafana.md).
 
 ## Service Discovery (Optional)
 
@@ -131,6 +84,7 @@ scrape_configs:
 ```
 
 Example target file (`targets/omp_usage/mac-mini.json`):
+
 ```json
 [
   {
@@ -159,17 +113,20 @@ remote_write:
 ## Verification
 
 Test scrape:
+
 ```bash
 curl -s http://exporter.example.internal:9464/metrics | grep omp_llm
 ```
 
 Check target status in Prometheus UI:
+
 - Status → Targets → `omp_usage` job
 - Should show `UP` with recent scrape
 
 ## Retention
 
 Recommended retention for usage metrics:
+
 - **Raw samples**: 14 days (enough for hourly/daily rates)
 - **Downsampled (1h)**: 1 year (for trend analysis)
 

@@ -15,7 +15,13 @@ export const EventTypeSchema = z.enum(['assistant_message_end']);
  * Stop reason from the OMP assistant message.
  * Matches the StopReason type from @oh-my-pi/pi-catalog/types.
  */
-export const StopReasonSchema = z.enum(['stop', 'length', 'toolUse', 'error', 'aborted']);
+export const KNOWN_STOP_REASONS = ['stop', 'length', 'toolUse', 'error', 'aborted'] as const;
+
+/**
+ * Any short string is accepted so that a new stop reason introduced by OMP
+ * does not make whole events invalid; the known values are listed above.
+ */
+export const StopReasonSchema = z.string().min(1).max(64);
 
 /**
  * Usage data as reported by OMP.

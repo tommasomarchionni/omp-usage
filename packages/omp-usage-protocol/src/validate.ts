@@ -1,10 +1,5 @@
-import {
-  UsageEventSchema,
-  UsageEvent,
-  UsageEventInput,
-  SCHEMA_VERSION,
-} from "./schema.js";
-import { randomUUID } from "crypto";
+import { UsageEventSchema, UsageEvent, UsageEventInput, SCHEMA_VERSION } from './schema.js';
+import { randomUUID } from 'crypto';
 export interface ValidationResult {
   valid: boolean;
   event?: UsageEvent;
@@ -24,17 +19,18 @@ export function validateEventDetailed(data: unknown): ValidationResult {
   }
   return {
     valid: false,
-    errors: result.error.issues.map((issue) => ({
-      path: issue.path.join("."),
+    errors: result.error.issues.map(issue => ({
+      path: issue.path.join('.'),
       message: issue.message,
       code: issue.code,
     })),
   };
 }
 
-export function validateEvents(
-  data: unknown[],
-): { valid: UsageEvent[]; invalid: { index: number; errors: ValidationError[] }[] } {
+export function validateEvents(data: unknown[]): {
+  valid: UsageEvent[];
+  invalid: { index: number; errors: ValidationError[] }[];
+} {
   const valid: UsageEvent[] = [];
   const invalid: { index: number; errors: ValidationError[] }[] = [];
 
@@ -53,7 +49,7 @@ export function validateEvents(
 export function validateJsonlLine(line: string): ValidationResult {
   const trimmed = line.trim();
   if (trimmed.length === 0) {
-    return { valid: false, errors: [{ path: "", message: "Empty line", code: "empty_line" }] };
+    return { valid: false, errors: [{ path: '', message: 'Empty line', code: 'empty_line' }] };
   }
   try {
     const parsed = JSON.parse(trimmed);
@@ -61,7 +57,13 @@ export function validateJsonlLine(line: string): ValidationResult {
   } catch (e) {
     return {
       valid: false,
-      errors: [{ path: "", message: e instanceof Error ? e.message : "Invalid JSON", code: "invalid_json" }],
+      errors: [
+        {
+          path: '',
+          message: e instanceof Error ? e.message : 'Invalid JSON',
+          code: 'invalid_json',
+        },
+      ],
     };
   }
 }
@@ -90,7 +92,7 @@ export function createEvent(input: UsageEventInput): UsageEvent {
   };
 }
 
-export function validateUsageAccounting(usage: UsageEvent["usage"]): string[] {
+export function validateUsageAccounting(usage: UsageEvent['usage']): string[] {
   const warnings: string[] = [];
 
   if (!usage) {
@@ -103,17 +105,17 @@ export function validateUsageAccounting(usage: UsageEvent["usage"]): string[] {
     }
   };
 
-  checkNonNegative(usage.input, "usage.input");
-  checkNonNegative(usage.output, "usage.output");
-  checkNonNegative(usage.cacheRead, "usage.cacheRead");
-  checkNonNegative(usage.cacheWrite, "usage.cacheWrite");
-  checkNonNegative(usage.totalTokens, "usage.totalTokens");
-  checkNonNegative(usage.reasoningTokens, "usage.reasoningTokens");
-  checkNonNegative(usage.cost?.input, "usage.cost.input");
-  checkNonNegative(usage.cost?.output, "usage.cost.output");
-  checkNonNegative(usage.cost?.cacheRead, "usage.cost.cacheRead");
-  checkNonNegative(usage.cost?.cacheWrite, "usage.cost.cacheWrite");
-  checkNonNegative(usage.cost?.total, "usage.cost.total");
+  checkNonNegative(usage.input, 'usage.input');
+  checkNonNegative(usage.output, 'usage.output');
+  checkNonNegative(usage.cacheRead, 'usage.cacheRead');
+  checkNonNegative(usage.cacheWrite, 'usage.cacheWrite');
+  checkNonNegative(usage.totalTokens, 'usage.totalTokens');
+  checkNonNegative(usage.reasoningTokens, 'usage.reasoningTokens');
+  checkNonNegative(usage.cost?.input, 'usage.cost.input');
+  checkNonNegative(usage.cost?.output, 'usage.cost.output');
+  checkNonNegative(usage.cost?.cacheRead, 'usage.cost.cacheRead');
+  checkNonNegative(usage.cost?.cacheWrite, 'usage.cost.cacheWrite');
+  checkNonNegative(usage.cost?.total, 'usage.cost.total');
 
   if (
     usage.reasoningTokens !== undefined &&
@@ -138,5 +140,5 @@ export function validateUsageAccounting(usage: UsageEvent["usage"]): string[] {
   return warnings;
 }
 
-export { UsageEventSchema, SCHEMA_VERSION } from "./schema.js";
-export type { UsageEvent, UsageEventInput } from "./schema.js";
+export { UsageEventSchema, SCHEMA_VERSION } from './schema.js';
+export type { UsageEvent, UsageEventInput } from './schema.js';

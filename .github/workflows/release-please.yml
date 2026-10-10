@@ -6,17 +6,46 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+  contents: read
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
 
 jobs:
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write # dispatch publish.yml
     steps:
       - name: Run release-please
-        uses: googleapis/release-please-action@v5
+        id: rp
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # Releases created with GITHUB_TOKEN do not trigger `release` workflows,
+      # but workflow_dispatch is allowed: start publish.yml for each package.
+      - name: Dispatch publish for released packages
+        if: steps.rp.outputs.releases_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PLUGIN_RELEASED: ${{ steps.rp.outputs['packages/omp-usage--release_created'] }}
+          PLUGIN_TAG: ${{ steps.rp.outputs['packages/omp-usage--tag_name'] }}
+          EXPORTER_RELEASED: ${{ steps.rp.outputs['packages/omp-usage-exporter--release_created'] }}
+          EXPORTER_TAG: ${{ steps.rp.outputs['packages/omp-usage-exporter--tag_name'] }}
+        run: |
+          set -euo pipefail
+          if [ "$PLUGIN_RELEASED" = "true" ]; then
+            gh workflow run publish.yml --repo "$REPO" --ref "$PLUGIN_TAG" -f package=omp-usage -f tag="$PLUGIN_TAG"
+          fi
+          if [ "$EXPORTER_RELEASED" = "true" ]; then
+            gh workflow run publish.yml --repo "$REPO" --ref "$EXPORTER_TAG" -f package=omp-usage-exporter -f tag="$EXPORTER_TAG"
+          fi
