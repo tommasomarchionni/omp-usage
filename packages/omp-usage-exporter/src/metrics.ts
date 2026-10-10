@@ -1,5 +1,5 @@
 import client, { Registry, Counter, Gauge } from "@prometheus-io/client";
-import type { AggregatedMetrics } from "@tommasomarchionni/omp-usage-protocol";
+import type { AggregatedMetrics } from "./protocol.js";
 
 export function createRegistry(): Registry {
   const registry = new Registry();

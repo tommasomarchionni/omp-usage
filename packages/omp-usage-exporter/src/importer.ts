@@ -2,7 +2,7 @@ import { createReadStream, statSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { EventEmitter } from "node:events";
 import { ExporterDatabase } from "./database.js";
-import { validateJsonlLine, type UsageEvent, SCHEMA_VERSION, type FileCursor } from "@tommasomarchionni/omp-usage-protocol";
+import { validateJsonlLine, type UsageEvent, SCHEMA_VERSION, type FileCursor } from "./protocol.js";
 import type { ResolvedConfig } from "./config.js";
 
 export interface ImporterEvents {

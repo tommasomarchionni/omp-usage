@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { mkdirSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
-import type { FileCursor, AggregatedMetrics } from "@tommasomarchionni/omp-usage-protocol";
+import type { FileCursor, AggregatedMetrics } from "./protocol.js";
 
 export const SCHEMA_VERSION = 1;
 

@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { ExporterConfig } from "@tommasomarchionni/omp-usage-protocol";
+import type { ExporterConfig } from "./protocol.js";
 
 export interface ResolvedConfig extends ExporterConfig {
   eventsDir: string;

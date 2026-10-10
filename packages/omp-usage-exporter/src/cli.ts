@@ -1,14 +1,11 @@
+#!/usr/bin/env node
 import { Command } from "commander";
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { resolveConfig, validateConfig } from "./config.js";
 import { ExporterDatabase } from "./database.js";
 import { Importer } from "./importer.js";
 import { createAllMetrics, updateLlmMetricsFromAggregates } from "./metrics.js";
 import { ExporterServer } from "./server.js";
 import { ShutdownManager } from "./shutdown.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 async function getVersion(): Promise<string> {
   try {

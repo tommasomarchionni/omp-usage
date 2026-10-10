@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createAllMetrics, sanitizeLabel, updateLlmMetricsFromAggregates } from "./metrics.js";
-import type { AggregatedMetrics } from "@tommasomarchionni/omp-usage-protocol";
+import type { AggregatedMetrics } from "./protocol.js";
 
 describe("sanitizeLabel", () => {
   it("replaces invalid characters", () => {
