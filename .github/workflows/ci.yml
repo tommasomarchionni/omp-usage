@@ -56,6 +56,8 @@ jobs:
         run: npm run build
       - name: Run tests
         run: npm run test
+      - name: Run integration tests
+        run: npm run test:integration
 
   build:
     name: Build
@@ -76,10 +78,10 @@ jobs:
         run: |
           test -f packages/omp-usage/dist/index.js
           test -f packages/omp-usage/dist/index.d.ts
-          test -f packages/omp-usage-protocol/dist/index.js
-          test -f packages/omp-usage-protocol/dist/index.d.ts
-          test -f packages/omp-usage-exporter/dist/cli.js
-          test -f packages/omp-usage-exporter/dist/cli.d.ts
+          test -x packages/omp-usage-exporter/dist/cli.js
+          node packages/omp-usage-exporter/dist/cli.js --version
+          # The internal protocol package must be bundled, never imported at runtime
+          ! grep -qE "(from|import\()[[:space:]]*['\"]@tommasomarchionni/omp-usage-protocol" packages/omp-usage-exporter/dist/cli.js
 
   package-smoke:
     name: Package Smoke Test

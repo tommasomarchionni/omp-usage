@@ -1,193 +1,123 @@
 # Exporter
 
-The Node.js exporter (`@tommasomarchionni/omp-usage-exporter`) imports JSONL event files, stores them in SQLite, and exposes Prometheus metrics.
+The Node.js exporter (`@tommasomarchionni/omp-usage-exporter`) imports the JSONL event files written by the plugin, stores them in SQLite and exposes Prometheus metrics.
 
-## How It Works
+## How it works
 
-1. **Scans events directory** — Finds all `*.jsonl` files
-2. **Imports incrementally** — Tracks cursor per file (byte offset), only reads new lines
-3. **Stores in SQLite** — Events, aggregates, and cursors in a local database
-4. **Exposes `/metrics`** — Prometheus-compatible metrics endpoint
-5. **Handles shutdown** — Graceful stop on SIGINT/SIGTERM
+1. **Continuous import**: an import cycle runs at startup and then every `--poll-interval-ms` (default 5 s). On filesystems that support it, `fs.watch` triggers a cycle shortly after a file changes. Polling is always active because `fs.watch` is unreliable on network filesystems and some containers (`--no-watch` disables the watcher).
+2. **Incremental reads**: a per-file cursor stores the byte offset after the last processed line, so each cycle reads only new bytes.
+3. **Atomic batches**: events, aggregates, invalid-record counters and the cursor are committed in one SQLite transaction (500 lines per batch).
+4. **Metrics at scrape time**: `/metrics` reads the aggregates from SQLite on every scrape. Counters always match the database, survive restarts and are never double counted.
+5. **Graceful shutdown**: on SIGINT/SIGTERM the exporter stops HTTP, finishes the in-flight batch, checkpoints and closes SQLite. See [Shutdown](shutdown.md).
 
-## Command Line Interface
+## Command line
 
-```bash
+```text
 omp-usage-exporter [options]
 
-Options:
-  --events-dir <path>           Events directory (env: OMP_USAGE_EVENTS_DIR)
-  --db-path <path>              SQLite database path (env: OMP_USAGE_DB_PATH)
-  --listen <host:port>          HTTP listen address (env: OMP_USAGE_LISTEN)
-  --max-line-length <bytes>     Max line length (env: OMP_USAGE_MAX_LINE_LENGTH)
-  --log-level <level>           Log level: debug, info, warn, error
-  --max-label-cardinality <n>   Max (provider,model) pairs (env: OMP_USAGE_MAX_LABEL_CARDINALITY)
-  --config-check                Validate config and exit
-  --import-once                 Import all files once and exit
-  -h, --help                    Show help
-  -V, --version                 Show version
+  --events-dir <path>            directory containing event JSONL files [env OMP_USAGE_EVENTS_DIR]
+  --db-path <path>               SQLite database path [env OMP_USAGE_DB_PATH]
+  --listen <addr>                host:port, [ipv6]:port or :port [env OMP_USAGE_LISTEN]
+  --max-line-length <bytes>      maximum JSONL line length [env OMP_USAGE_MAX_LINE_LENGTH]
+  --log-level <level>            debug | info | warn | error [env OMP_USAGE_LOG_LEVEL]
+  --max-label-cardinality <n>    maximum exported (provider, model) pairs [env OMP_USAGE_MAX_LABEL_CARDINALITY]
+  --poll-interval-ms <ms>        interval between import cycles [env OMP_USAGE_POLL_INTERVAL_MS]
+  --shutdown-timeout-ms <ms>     graceful shutdown budget [env OMP_USAGE_SHUTDOWN_TIMEOUT_MS]
+  --no-watch                     polling only (network filesystems)
+  --config-check                 validate configuration, print it as JSON and exit
+  --import-once                  run a single import cycle and exit
+  --backup <file>                online backup of the database, safe while the service runs
+  --rebuild-aggregates           recompute aggregates from stored events and exit
+  -V, --version                  print the version
+  -h, --help                     show help
 ```
 
-## Import Process
+Exit codes: `0` success, `1` runtime failure (locked database, listen error, import errors with `--import-once`, shutdown timeout), `2` invalid configuration or arguments.
 
-### File Discovery
+## Import guarantees
 
-- Scans `eventsDir` for `*.jsonl` files
-- Processes files in alphabetical order
-- Tracks cursor per file (byte offset, inode, device, mtime)
+| Situation | Behavior |
+|---|---|
+| Lines appended | Only the new bytes are read |
+| Trailing line without `\n` | Left in place; imported once the writer completes it |
+| Invalid JSON, schema violation, unknown `schemaVersion`, invalid UTF-8 | Skipped, counted once in `omp_usage_invalid_records_total{reason}`, cursor advances |
+| Line longer than `--max-line-length` | Skipped without being loaded in memory, counted as `line_too_long` |
+| Blank line | Ignored |
+| File truncated (`size < offset`) | Re-read from offset 0 |
+| File replaced (different inode/device) | Re-read from offset 0 |
+| File rewritten in place (bytes before the cursor changed) | Detected with a SHA-256 of the 256 bytes before the cursor and re-read from 0 |
+| File renamed | Treated as a new path, re-read from 0 |
+| File deleted | Cursor kept, no error |
+| Symlink or non-regular file inside the events directory | Ignored with a warning (opened with `O_NOFOLLOW`) |
 
-### Line Reading
+Every re-read is safe: `eventId` has a `UNIQUE` constraint and duplicates never update aggregates. Re-reads are counted in `omp_usage_file_resets_total{reason}`.
 
-- Reads only complete lines (terminated by `\n`)
-- Preserves incomplete trailing line for next import
-- Enforces `maxLineLength` (default 1 MiB) — longer lines are skipped
+The events directory itself may be a symlink chosen by you; only entries inside it are restricted.
 
-### Event Validation
+## Single writer
 
-Each line is validated against schema v1:
-- Valid events → imported, aggregates updated
-- Invalid JSON → skipped, `import_errors_malformed` incremented
-- Unknown schema version → skipped, `import_errors_unknown_schema` incremented
-- Line too long → skipped, `import_errors_line_too_long` incremented
+On startup the exporter takes an OS-level exclusive lock on `<db-path>.lock`, through SQLite with `locking_mode=EXCLUSIVE`. A second exporter on the same database exits with code 1 and the message `locked by another process`. The OS releases the lock if the process crashes, so a stale lock never needs manual cleanup.
 
-### Deduplication
+The main database stays readable while the exporter runs, for example with `sqlite3` or `--backup`.
 
-- `eventId` has UNIQUE constraint in SQLite
-- Duplicate `eventId` → skipped, cursor still advanced
-- Safe to re-import same files
+## Database schema
 
-### Transactional Import
+`PRAGMA user_version` stores the schema version (currently `2`). Migrations run automatically at startup inside a transaction. A database written by a newer exporter is refused instead of being modified.
 
-Each batch (100 events) is atomic:
-```
-BEGIN IMMEDIATE;
-  INSERT OR IGNORE INTO events ...
-  UPDATE aggregates ...
-  UPDATE cursors ...
-COMMIT;
-```
+| Table | Content |
+|---|---|
+| `events` | One row per event (`event_id` UNIQUE), flattened usage fields, validated JSON |
+| `cursors` | `file_path`, `offset`, `file_size`, `inode`, `device`, `mtime_ms`, `tail_hash` |
+| `aggregates` | Per `(provider, model)`: tokens, reasoning, requests by status, reported cost, usage/cost missing |
+| `stop_reason_aggregates` | Per `(provider, model, stop_reason)` counts |
+| `invalid_records` | Skipped lines by reason |
 
-### File Handling
+Events without a provider or model are aggregated under the label value `unknown`. The `events` row keeps `NULL`.
 
-| File Change | Behavior |
-|-------------|----------|
-| Appended lines | New lines imported |
-| Truncated | Cursor reset, re-read from start |
-| Renamed | Detected via inode/device mismatch, treated as new file |
-| Replaced | Detected via size/mtime change, treated as new file |
-| Deleted | Cursor remains, no error |
+Upgrading from 0.2.x: the v2 migration rebuilds aggregates from `events` and resets cursors. Offsets written by 0.2.x were wrong, so every file is read once more and deduplicated by `eventId`.
 
-## Database Schema
+## HTTP endpoints
 
-### `events` table
+Only `GET`/`HEAD` on two paths are served; every other path returns 404 and other methods return 405. Nothing exposes event files or database content.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment |
-| `event_id` | TEXT UNIQUE | Event UUID |
-| `session_run_id` | TEXT | Session UUID |
-| `timestamp` | TEXT | ISO 8601 |
-| `event_type` | TEXT | Event type |
-| `provider` | TEXT | Provider name |
-| `model` | TEXT | Model identifier |
-| `api` | TEXT | API transport |
-| `stop_reason` | TEXT | Stop reason |
-| `usage_*` | INTEGER/REAL | Flattened usage fields |
-| `raw_json` | TEXT | Full event JSON |
+### `/metrics`
 
-### `cursors` table
+Prometheus text format. See [Metrics](metrics.md).
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `file_path` | TEXT PK | Absolute file path |
-| `offset` | INTEGER | Byte offset of last imported line |
-| `file_size` | INTEGER | File size at last read |
-| `inode` | INTEGER | Inode for rename detection |
-| `device` | INTEGER | Device ID for rename detection |
-| `mtime_ms` | INTEGER | Modification time (ms) |
+### `/healthz`
 
-### `aggregates` table
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `provider` | TEXT PK | Provider name |
-| `model` | TEXT PK | Model identifier |
-| `input_tokens` | INTEGER | Sum of input tokens |
-| `output_tokens` | INTEGER | Sum of output tokens |
-| `cache_read_tokens` | INTEGER | Sum of cache read tokens |
-| `cache_write_tokens` | INTEGER | Sum of cache write tokens |
-| `reasoning_tokens` | INTEGER | Sum of reasoning tokens |
-| `requests_success` | INTEGER | Successful requests |
-| `requests_error` | INTEGER | Error requests |
-| `reported_cost_usd` | REAL | Sum of reported costs |
-| `usage_missing` | INTEGER | Events with null usage |
-
-### `operational_metrics` table
-
-Key-value store for exporter metrics (import errors, last import timestamp, etc.)
-
-## HTTP Endpoints
-
-### `GET /metrics`
-
-Prometheus metrics in text format. Includes:
-- LLM metrics (tokens, requests, cost)
-- Operational metrics (import errors, invalid records, last import)
-
-### `GET /healthz`
-
-Health check endpoint:
 ```json
 {
   "status": "ok",
-  "lastImport": "2026-01-15T10:30:00.000Z",
-  "timestamp": "2026-01-15T10:30:00.000Z"
+  "database": true,
+  "lastImport": "2026-10-10T10:30:00.000Z",
+  "lastImportOk": true,
+  "lastError": null,
+  "timestamp": "2026-10-10T10:30:02.000Z"
 }
 ```
 
-## Graceful Shutdown
+| `status` | HTTP | Meaning |
+|---|---|---|
+| `ok` | 200 | Database reachable, last cycle succeeded recently |
+| `degraded` | 503 | Last cycle had file errors, or no success for `max(3 × poll interval, 60 s)` |
+| `unavailable` | 503 | Database not usable |
 
-On SIGINT/SIGTERM:
-1. Stop accepting HTTP connections
-2. Wait for in-flight requests (max 30s)
-3. Stop importer (finish current batch)
-4. Close SQLite database
-5. Exit
+## Network exposure
 
-## Single Instance Guarantee
+The default listener is `127.0.0.1:9464`. Binding any non-loopback address logs a warning at startup. When Prometheus runs on another host, bind the LAN address explicitly (`--listen 192.168.1.50:9464`). Avoid `0.0.0.0` and restrict the port with the macOS firewall or your network. The endpoint has no authentication, but it only exposes aggregated counters labelled by provider and model.
 
-The exporter uses SQLite's file locking. Running two exporters on the same database will cause the second to fail with "database is locked". Use a process manager (systemd, launchd) to ensure single instance.
+## Performance
 
-## Performance Notes
-
-- **Batch size**: 100 events per transaction
-- **Flush interval**: 1 second (plugin side)
-- **Import rate**: ~10,000 events/second on SSD
-- **Database size**: ~1 KB per event (with raw JSON)
-- **Memory**: ~50 MB baseline + queue
+| Aspect | Value |
+|---|---|
+| Batch size | 500 lines per transaction, yielding to the event loop between batches |
+| Read buffer | 64 KiB; memory per line bounded by `--max-line-length` |
+| Scrape cost | One aggregate query per scrape (one row per provider/model) |
+| Database size | ~1 KB per event |
 
 ## Troubleshooting
 
-### Database locked
-
-```bash
-# Check for other processes
-lsof ~/.local/state/omp-usage/exporter.db
-```
-
-### Import stuck
-
-Check logs for:
-- Large files (increase `maxLineLength`)
-- Malformed lines (check source)
-- Disk space
-
-### High memory
-
-Reduce batch size or increase flush frequency.
-
-### Missing metrics
-
-- Check `/healthz` for last import timestamp
-- Verify events directory has new files
-- Check exporter logs for errors
+- `locked by another process`: another exporter (often the launchd service) is running. Use `launchctl list | grep omp-usage`.
+- Metrics not updating: check `/healthz`, `omp_usage_last_import_timestamp_seconds` and the logs (`--log-level debug`).
+- `omp_usage_invalid_records_total` growing: run with `--log-level debug` to see file and byte offset of each skipped line.

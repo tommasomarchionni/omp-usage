@@ -1,64 +1,79 @@
-export const SCHEMA_VERSION = 1;
+/**
+ * Event protocol used by the exporter.
+ *
+ * The schema lives in the internal `@tommasomarchionni/omp-usage-protocol`
+ * workspace package and is bundled into `dist/cli.js` at build time, so the
+ * published exporter has a single source of truth for validation and does not
+ * depend on an unpublished package at runtime.
+ */
+import {
+  SCHEMA_VERSION,
+  UsageEventSchema,
+  type UsageEvent,
+} from '@tommasomarchionni/omp-usage-protocol';
 
-export interface UsageCost {
-  input: number;
-  output: number;
-  cacheRead: number;
-  cacheWrite: number;
-  total: number;
-}
+export { SCHEMA_VERSION, UsageEventSchema, type UsageEvent };
 
-export interface Usage {
-  input: number;
-  output: number;
-  cacheRead?: number;
-  cacheWrite?: number;
-  totalTokens?: number;
-  reasoningTokens?: number;
-  cost: UsageCost;
-}
+export type InvalidReason =
+  'invalid_json' | 'invalid_schema' | 'unknown_schema_version' | 'line_too_long' | 'invalid_utf8';
 
-export interface UsageEvent {
-  schemaVersion: number;
-  eventId: string;
-  sessionRunId: string;
-  timestamp: string;
-  eventType: "assistant_message_end";
-  provider: string | null;
-  model: string | null;
-  api: string | null;
-  stopReason: "stop" | "length" | "toolUse" | "error" | "aborted" | null;
-  usage: Usage | null;
-}
+export type ParseResult =
+  { ok: true; event: UsageEvent } | { ok: false; reason: InvalidReason; message: string };
 
-export interface ValidationError {
-  path: string;
-  message: string;
-  code: string;
-}
+/**
+ * Parses and validates one JSONL line (without the trailing newline).
+ * Never throws.
+ */
+export function parseEventLine(line: string): ParseResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch (e) {
+    return {
+      ok: false,
+      reason: 'invalid_json',
+      message: e instanceof Error ? e.message : 'Invalid JSON',
+    };
+  }
 
-export interface ValidationResult {
-  valid: boolean;
-  event?: UsageEvent;
-  errors?: ValidationError[];
-}
+  if (
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    'schemaVersion' in parsed &&
+    typeof (parsed as { schemaVersion: unknown }).schemaVersion === 'number' &&
+    (parsed as { schemaVersion: number }).schemaVersion !== SCHEMA_VERSION
+  ) {
+    return {
+      ok: false,
+      reason: 'unknown_schema_version',
+      message: `Unsupported schemaVersion ${(parsed as { schemaVersion: number }).schemaVersion}`,
+    };
+  }
 
-export interface ExporterConfig {
-  eventsDir: string;
-  dbPath: string;
-  listen: string;
-  maxLineLength: number;
-  logLevel: "debug" | "info" | "warn" | "error";
-  maxLabelCardinality: number;
+  const result = UsageEventSchema.safeParse(parsed);
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    return {
+      ok: false,
+      reason: 'invalid_schema',
+      message: issue
+        ? `${issue.path.join('.') || '<root>'}: ${issue.message}`
+        : 'Schema validation failed',
+    };
+  }
+  return { ok: true, event: result.data };
 }
 
 export interface FileCursor {
   filePath: string;
+  /** Byte offset just after the last fully processed line. */
   offset: number;
   fileSize: number;
   inode: number;
   device: number;
   mtimeMs: number;
+  /** sha256 of up to 256 bytes preceding `offset`; detects in-place rewrites. */
+  tailHash?: string | null;
 }
 
 export interface AggregatedMetrics {
@@ -71,55 +86,15 @@ export interface AggregatedMetrics {
   reasoningTokens: number;
   requestsSuccess: number;
   requestsError: number;
+  requestsAborted: number;
   reportedCostUsd: number;
   usageMissing: number;
+  costMissing: number;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function validateEventShape(value: unknown): ValidationResult {
-  if (!isRecord(value)) {
-    return { valid: false, errors: [{ path: "", message: "Event must be an object", code: "invalid_type" }] };
-  }
-
-  const event = value as Partial<UsageEvent>;
-  if (typeof event.schemaVersion !== "number") {
-    return { valid: false, errors: [{ path: "schemaVersion", message: "schemaVersion must be a number", code: "invalid_type" }] };
-  }
-  if (typeof event.eventId !== "string" || event.eventId.length === 0) {
-    return { valid: false, errors: [{ path: "eventId", message: "eventId must be a non-empty string", code: "invalid_type" }] };
-  }
-  if (typeof event.sessionRunId !== "string" || event.sessionRunId.length === 0) {
-    return { valid: false, errors: [{ path: "sessionRunId", message: "sessionRunId must be a non-empty string", code: "invalid_type" }] };
-  }
-  if (typeof event.timestamp !== "string" || event.timestamp.length === 0) {
-    return { valid: false, errors: [{ path: "timestamp", message: "timestamp must be a non-empty string", code: "invalid_type" }] };
-  }
-  if (event.eventType !== "assistant_message_end") {
-    return {
-      valid: false,
-      errors: [{ path: "eventType", message: "eventType must be assistant_message_end", code: "invalid_value" }],
-    };
-  }
-
-  return { valid: true, event: event as UsageEvent };
-}
-
-export function validateJsonlLine(line: string): ValidationResult {
-  const trimmed = line.trim();
-  if (trimmed.length === 0) {
-    return { valid: false, errors: [{ path: "", message: "Empty line", code: "empty_line" }] };
-  }
-
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    return validateEventShape(parsed);
-  } catch (error) {
-    return {
-      valid: false,
-      errors: [{ path: "", message: error instanceof Error ? error.message : "Invalid JSON", code: "invalid_json" }],
-    };
-  }
+export interface StopReasonAggregate {
+  provider: string;
+  model: string;
+  stopReason: string;
+  count: number;
 }

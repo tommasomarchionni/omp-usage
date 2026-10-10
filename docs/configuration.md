@@ -51,14 +51,19 @@ The plugin registers `/omp-usage` commands for runtime operations:
 
 ## Exporter Configuration
 
+Flags take precedence over environment variables, which take precedence over defaults. Empty environment variables are ignored. Numeric values must be plain positive integers (`10abc`, `1e3` or `-1` are rejected with exit code 2).
+
 | Flag | Environment Variable | Default | Description |
 |------|---------------------|---------|-------------|
 | `--events-dir` | `OMP_USAGE_EVENTS_DIR` | `~/.local/state/omp-usage/events` | Directory to scan for event JSONL files |
-| `--db-path` | `OMP_USAGE_DB_PATH` | `~/.local/state/omp-usage/exporter.db` | SQLite database path |
-| `--listen` | `OMP_USAGE_LISTEN` | `127.0.0.1:9464` | HTTP listen address (host:port) |
-| `--max-line-length` | `OMP_USAGE_MAX_LINE_LENGTH` | `1048576` | Maximum line length for JSONL parsing (bytes) |
-| `--log-level` | `OMP_USAGE_LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
-| `--max-label-cardinality` | `OMP_USAGE_MAX_LABEL_CARDINALITY` | `1000` | Maximum unique (provider, model) pairs for metrics |
+| `--db-path` | `OMP_USAGE_DB_PATH` | `~/.local/state/omp-usage/exporter.db` | SQLite database path (a `<db-path>.lock` file is created next to it) |
+| `--listen` | `OMP_USAGE_LISTEN` | `127.0.0.1:9464` | `host:port`, `[ipv6]:port` or `:port` (all interfaces) |
+| `--max-line-length` | `OMP_USAGE_MAX_LINE_LENGTH` | `1048576` | Maximum JSONL line length in bytes |
+| `--log-level` | `OMP_USAGE_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `--max-label-cardinality` | `OMP_USAGE_MAX_LABEL_CARDINALITY` | `1000` | Maximum exported `(provider, model)` pairs |
+| `--poll-interval-ms` | `OMP_USAGE_POLL_INTERVAL_MS` | `5000` | Interval between import cycles (minimum 100) |
+| `--shutdown-timeout-ms` | `OMP_USAGE_SHUTDOWN_TIMEOUT_MS` | `10000` | Graceful shutdown budget before exiting with code 1 |
+| `--no-watch` | | watcher on | Disable `fs.watch` and rely on polling |
 
 ## Configuration Examples
 
@@ -66,59 +71,31 @@ The plugin registers `/omp-usage` commands for runtime operations:
 ```bash
 export OMP_USAGE_EVENTS_DIR=~/omp-usage/events
 export OMP_USAGE_DB_PATH=~/omp-usage/exporter.db
-export OMP_USAGE_LISTEN=127.0.0.1:9464
 export OMP_USAGE_LOG_LEVEL=debug
 omp-usage-exporter
 ```
 
-### Production (LAN accessible)
-```bash
-export OMP_USAGE_EVENTS_DIR=/var/lib/omp-usage/events
-export OMP_USAGE_DB_PATH=/var/lib/omp-usage/exporter.db
-export OMP_USAGE_LISTEN=0.0.0.0:9464
-export OMP_USAGE_LOG_LEVEL=info
-omp-usage-exporter
-```
+### Prometheus on another host (LAN)
 
-### Production (localhost only, with custom cardinality)
+Bind the LAN address of the machine explicitly instead of `0.0.0.0`:
+
 ```bash
-export OMP_USAGE_EVENTS_DIR=/var/lib/omp-usage/events
-export OMP_USAGE_DB_PATH=/var/lib/omp-usage/exporter.db
-export OMP_USAGE_LISTEN=127.0.0.1:9464
-export OMP_USAGE_MAX_LABEL_CARDINALITY=500
+export OMP_USAGE_LISTEN=192.168.1.50:9464
 omp-usage-exporter
 ```
 
 ## Configuration Validation
 
-Validate your configuration without starting the server:
-
 ```bash
 omp-usage-exporter --config-check
 ```
 
-Output:
-```
-Configuration valid:
-{
-  "eventsDir": "/home/user/.local/state/omp-usage/events",
-  "dbPath": "/home/user/.local/state/omp-usage/exporter.db",
-  "listen": "127.0.0.1:9464",
-  "maxLineLength": 1048576,
-  "logLevel": "info",
-  "maxLabelCardinality": 1000
-}
-```
+Prints the resolved configuration as JSON on stdout and exits with code 0, or prints `Configuration error: ...` on stderr and exits with code 2.
 
 ## One-time Import
-
-Import all events and exit without starting the HTTP server:
 
 ```bash
 omp-usage-exporter --import-once
 ```
 
-Useful for:
-- Backfilling historical data
-- Cron jobs
-- Testing
+Runs one import cycle without the HTTP server and exits (code 1 if any file failed). Do not run it while the service is running: the database lock makes it exit with code 1.

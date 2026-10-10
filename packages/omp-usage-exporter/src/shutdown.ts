@@ -1,66 +1,87 @@
-import type { ExporterDatabase } from "./database.js";
-import type { Importer } from "./importer.js";
-import type { ExporterServer } from "./server.js";
+import type { Logger } from './logger.js';
 
+export interface Stoppable {
+  name: string;
+  stop: () => Promise<void> | void;
+}
+
+/**
+ * Ordered, idempotent, time-bounded shutdown.
+ *
+ * Steps run sequentially in the given order. If the whole sequence exceeds
+ * `timeoutMs` the returned promise resolves with `ok: false` so the caller can
+ * exit with a non-zero code; the timer is always cleared.
+ */
 export class ShutdownManager {
-  private readonly server: ExporterServer;
-  private readonly importer: Importer;
-  private readonly database: ExporterDatabase;
-  private readonly shutdownTimeout: number;
-  private shuttingDown = false;
+  private promise: Promise<{ ok: boolean }> | null = null;
+  private handlers: Array<{ signal: NodeJS.Signals; fn: () => void }> = [];
 
   constructor(
-    server: ExporterServer,
-    importer: Importer,
-    database: ExporterDatabase,
-    shutdownTimeoutMs = 30000,
-  ) {
-    this.server = server;
-    this.importer = importer;
-    this.database = database;
-    this.shutdownTimeout = shutdownTimeoutMs;
+    private readonly steps: Stoppable[],
+    private readonly logger: Logger,
+    private readonly timeoutMs: number
+  ) {}
+
+  get inProgress(): boolean {
+    return this.promise !== null;
   }
 
-  setupSignals(): void {
-    const handleSignal = (signal: NodeJS.Signals) => {
-      this.shutdown(signal).catch((err) => {
-        console.error(`Error during shutdown (${signal}):`, err);
-        process.exit(1);
-      });
-    };
+  shutdown(reason: string): Promise<{ ok: boolean }> {
+    if (this.promise) return this.promise;
+    this.logger.info('shutdown initiated', { reason });
 
-    process.on("SIGINT", handleSignal);
-    process.on("SIGTERM", handleSignal);
-  }
-
-  async shutdown(signal?: NodeJS.Signals): Promise<void> {
-    if (this.shuttingDown) {
-      return;
-    }
-    this.shuttingDown = true;
-
-    console.log(`Shutdown initiated${signal ? ` by ${signal}` : ""}...`);
-
-    const timeout = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error("Shutdown timeout")), this.shutdownTimeout);
-    });
-
-    const shutdownProcess = (async () => {
-      console.log("Stopping HTTP server...");
-      await this.server.stop();
-      console.log("HTTP server stopped.");
-
-      console.log("Stopping importer...");
-      this.importer.stop();
-      console.log("Importer stopped.");
-
-      console.log("Closing database...");
-      this.database.close();
-      console.log("Database closed.");
-
-      console.log("Shutdown complete.");
+    const sequence = (async () => {
+      for (const step of this.steps) {
+        const t = Date.now();
+        await step.stop();
+        this.logger.debug('stopped', { component: step.name, ms: Date.now() - t });
+      }
     })();
 
-    await Promise.race([shutdownProcess, timeout]);
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<'timeout'>(resolve => {
+      timer = setTimeout(() => resolve('timeout'), this.timeoutMs);
+      timer.unref();
+    });
+
+    this.promise = Promise.race([sequence.then(() => 'done' as const), timeout])
+      .then(r => {
+        if (r === 'timeout') {
+          this.logger.error('shutdown timed out', { timeoutMs: this.timeoutMs });
+          return { ok: false };
+        }
+        this.logger.info('shutdown complete');
+        return { ok: true };
+      })
+      .catch((e: unknown) => {
+        this.logger.error('shutdown failed', { error: e instanceof Error ? e.message : String(e) });
+        return { ok: false };
+      })
+      .finally(() => clearTimeout(timer));
+    return this.promise;
+  }
+
+  /**
+   * Installs SIGINT/SIGTERM handlers. A second signal during shutdown forces
+   * an immediate exit (useful when a step hangs).
+   */
+  installSignalHandlers(exit: (code: number) => void = c => process.exit(c)): void {
+    for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+      const fn = () => {
+        if (this.inProgress) {
+          this.logger.warn('second signal received, forcing exit', { signal });
+          exit(1);
+          return;
+        }
+        void this.shutdown(signal).then(({ ok }) => exit(ok ? 0 : 1));
+      };
+      process.on(signal, fn);
+      this.handlers.push({ signal, fn });
+    }
+  }
+
+  removeSignalHandlers(): void {
+    for (const { signal, fn } of this.handlers) process.off(signal, fn);
+    this.handlers = [];
   }
 }

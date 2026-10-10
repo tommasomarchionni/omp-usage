@@ -22,12 +22,15 @@
 ├── events table
 ├── cursors table
 ├── aggregates table
-├── operational_metrics table
-└── schema_info table
+├── stop_reason_aggregates table
+├── invalid_records table
+└── operational_metrics / schema_info tables
+~/.local/state/omp-usage/exporter.db.lock   (single-writer lock)
 ```
 
-- **WAL mode** for concurrent read/write
-- **Foreign keys**: Not enforced (single writer)
+- **WAL mode**: readers (sqlite3 CLI, backups) never block the exporter
+- **Single writer**: enforced by an OS lock on `exporter.db.lock`, released automatically on crash
+- **Schema version**: `PRAGMA user_version`, migrated automatically at startup
 - **Indexes**: On `session_run_id`, `timestamp`, `provider,model`
 
 ## Backup
@@ -45,11 +48,14 @@ rsync -av ~/.local/state/omp-usage/events/ /backup/omp-usage-events/
 ### SQLite Database
 
 ```bash
-# Online backup (safe while exporter running)
-sqlite3 ~/.local/state/omp-usage/exporter.db ".backup /backup/exporter-$(date +%Y%m%d).db"
+# Online backup (safe while the exporter is running, file created with mode 0600)
+omp-usage-exporter --backup /backup/exporter-$(date +%Y%m%d).db
 
-# Or use sqlite3 backup API (recommended for production)
+# Equivalent with the sqlite3 CLI
+sqlite3 ~/.local/state/omp-usage/exporter.db ".backup /backup/exporter-$(date +%Y%m%d).db"
 ```
+
+Never copy `exporter.db` with `cp` while the exporter runs: the WAL file may hold committed transactions that are not yet in the main file.
 
 ### Automated Backup (cron)
 
@@ -65,7 +71,7 @@ mkdir -p "$BACKUP_DIR"
 rsync -av ~/.local/state/omp-usage/events/ "$BACKUP_DIR/events-$DATE/"
 
 # Database (online backup)
-sqlite3 ~/.local/state/omp-usage/exporter.db ".backup $BACKUP_DIR/exporter-$DATE.db"
+omp-usage-exporter --backup "$BACKUP_DIR/exporter-$DATE.db"
 
 # Retain last 30 days
 find "$BACKUP_DIR" -type f -name "exporter-*.db" -mtime +30 -delete
@@ -82,17 +88,29 @@ find "$BACKUP_DIR" -type d -name "events-*" -mtime +30 -exec rm -rf {} +
 rm -rf ~/.local/state/omp-usage/events
 cp -r ~/backups/omp-usage-events-20260115 ~/.local/state/omp-usage/events
 
-# Restart exporter (will re-import from cursors=0)
+# Restart the exporter. Files without a cursor are read from offset 0;
+# events already in the database are deduplicated by eventId.
 ```
 
 ### Restore Database
 
 ```bash
-# Stop exporter
-# Restore database
+# Stop the exporter (launchctl bootout ...), then:
+rm -f ~/.local/state/omp-usage/exporter.db-wal ~/.local/state/omp-usage/exporter.db-shm
 cp ~/backups/exporter-20260115.db ~/.local/state/omp-usage/exporter.db
+chmod 600 ~/.local/state/omp-usage/exporter.db
+# Restart the exporter: it resumes from the restored cursors and imports
+# anything written after the backup.
+```
 
-# Restart exporter
+### Rebuild from JSONL
+
+The JSONL files are the source of truth. If the database is lost, delete it and start the exporter: every file is re-imported. Prometheus counters drop and restart from the re-imported totals, which `increase()` handles as a counter reset.
+
+### Rebuild aggregates only
+
+```bash
+omp-usage-exporter --rebuild-aggregates   # with the service stopped
 ```
 
 ### Point-in-Time Recovery
@@ -109,21 +127,15 @@ Not supported in v1 (no WAL archiving). For PITR, use filesystem snapshots (APFS
 - Performance issues
 
 **If required**:
-- Use local storage for events and database
-- Sync to network storage via cron/rsync
+- Keep the database on local storage (SQLite locking over NFS/SMB is not reliable)
+- Run the exporter with `--no-watch` (polling only)
+- Expect re-reads if the server changes inode numbers; they are deduplicated
 
 ### Symlinks
 
-Events directory and database path **can be symlinks**:
-```bash
-ln -s /mnt/fast-ssd/omp-events ~/.local/state/omp-usage/events
-ln -s /mnt/fast-ssd/exporter.db ~/.local/state/omp-usage/exporter.db
-```
-
-**Caveats**:
-- Cursor inode/device tracking follows symlink target
-- Ensure target filesystem supports inode/device
-- Permissions apply to target, not symlink
+- The **events directory itself** may be a symlink (it is resolved once per cycle).
+- **Entries inside** the events directory that are symlinks, directories, FIFOs or devices are **ignored** with a warning. Files are opened with `O_NOFOLLOW`, so another local user cannot point a `.jsonl` entry at an arbitrary file.
+- The database path may be a symlink; keep it on a local filesystem.
 
 ### macOS Specific
 

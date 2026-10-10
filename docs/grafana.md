@@ -140,7 +140,7 @@ Import this JSON in Grafana → Dashboards → Import → Upload JSON file.
       "gridPos": {"x": 12, "y": 24, "w": 6, "h": 4},
       "targets": [
         {
-          "expr": "omp_usage_last_import_timestamp",
+          "expr": "omp_usage_last_import_timestamp_seconds",
           "refId": "A"
         }
       ],

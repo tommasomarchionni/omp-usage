@@ -1,114 +1,158 @@
-import http from "node:http";
-import { IncomingMessage, ServerResponse } from "node:http";
-import { parseListen } from "./config.js";
-import type { Registry } from "@prometheus-io/client";
-import type { OperationalMetrics } from "./metrics.js";
+import http from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { Registry } from '@prometheus-io/client';
+import { formatHostPort, parseListen } from './config.js';
+import type { ExporterDatabase } from './database.js';
+import type { Logger } from './logger.js';
+import { silentLogger } from './logger.js';
+import type { ExporterState } from './metrics.js';
 
+export interface ServerOptions {
+  listen: string;
+  /** /healthz turns unhealthy when the last successful import is older. */
+  staleAfterMs: number;
+  logger?: Logger;
+}
+
+export interface HealthReport {
+  status: 'ok' | 'degraded' | 'unavailable';
+  database: boolean;
+  lastImport: string | null;
+  lastImportOk: boolean;
+  lastError: string | null;
+  timestamp: string;
+}
+
+/**
+ * Minimal HTTP server: GET/HEAD /metrics and /healthz only. Nothing else is
+ * served, in particular no event file or database content.
+ */
 export class ExporterServer {
   private readonly server: http.Server;
-  private readonly listenPort: number;
-  private readonly listenHost: string;
-  private readonly registry: Registry;
-  private readonly operationalMetrics: OperationalMetrics;
+  private readonly host: string;
+  private port: number;
+  private readonly logger: Logger;
 
-  constructor(registry: Registry, operationalMetrics: OperationalMetrics, listen: string) {
-    this.registry = registry;
-    this.operationalMetrics = operationalMetrics;
-    const { host, port } = parseListen(listen);
-    this.listenHost = host;
-    this.listenPort = port;
+  constructor(
+    private readonly registry: Registry,
+    private readonly db: ExporterDatabase,
+    private readonly state: ExporterState,
+    private readonly options: ServerOptions
+  ) {
+    const { host, port } = parseListen(options.listen);
+    this.host = host;
+    this.port = port;
+    this.logger = options.logger ?? silentLogger;
 
     this.server = http.createServer((req, res) => {
-      this.handleRequest(req, res);
+      void this.handle(req, res);
     });
+    // Slowloris protection; Prometheus scrapes are tiny and fast.
+    this.server.headersTimeout = 10_000;
+    this.server.requestTimeout = 30_000;
+    this.server.keepAliveTimeout = 5_000;
+    this.server.maxHeadersCount = 50;
   }
 
-  private handleRequest(req: IncomingMessage, res: ServerResponse): void {
-    const url = req.url ?? "/";
+  health(now = Date.now()): { code: number; body: HealthReport } {
+    const database = this.db.ping();
+    const last = this.state.lastSuccessMs;
+    const stale =
+      last === null ? this.state.lastAttemptMs !== null : now - last > this.options.staleAfterMs;
+    let status: HealthReport['status'] = 'ok';
+    if (!database) status = 'unavailable';
+    else if (!this.state.lastCycleOk || stale) status = 'degraded';
+    return {
+      code: status === 'ok' ? 200 : 503,
+      body: {
+        status,
+        database,
+        lastImport: last === null ? null : new Date(last).toISOString(),
+        lastImportOk: this.state.lastCycleOk,
+        lastError: this.state.lastError,
+        timestamp: new Date(now).toISOString(),
+      },
+    };
+  }
+
+  private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'no-store');
+    const path = (req.url ?? '/').split('?')[0];
+    const method = req.method ?? 'GET';
 
     try {
-      if (url === "/metrics" && req.method === "GET") {
-        this.handleMetrics(req, res);
-      } else if (url === "/healthz" && req.method === "GET") {
-        this.handleHealthz(req, res);
-      } else {
-        this.handleNotFound(res);
+      if (path !== '/metrics' && path !== '/healthz') {
+        return this.text(res, 404, 'Not Found\n');
       }
-    } catch (e) {
-      this.handleError(res, e);
-    }
-  }
+      if (method !== 'GET' && method !== 'HEAD') {
+        res.setHeader('Allow', 'GET, HEAD');
+        return this.text(res, 405, 'Method Not Allowed\n');
+      }
 
-  private async handleMetrics(_req: IncomingMessage, res: ServerResponse): Promise<void> {
-    try {
+      if (path === '/healthz') {
+        const { code, body } = this.health();
+        const payload = JSON.stringify(body);
+        res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(method === 'HEAD' ? undefined : payload);
+        return;
+      }
+
       const metrics = await this.registry.metrics();
-      res.setHeader("Content-Type", this.registry.contentType);
-      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      res.writeHead(200);
-      res.end(metrics);
-    } catch {
-      res.writeHead(500);
-      res.end("Internal Server Error");
+      res.writeHead(200, { 'Content-Type': this.registry.contentType });
+      res.end(method === 'HEAD' ? undefined : metrics);
+    } catch (e) {
+      this.logger.error('request failed', {
+        path,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      if (!res.headersSent) this.text(res, 500, 'Internal Server Error\n');
+      else res.destroy();
     }
   }
 
-  private handleHealthz(_req: IncomingMessage, res: ServerResponse): void {
-    const lastImport = this.operationalMetrics.lastImportTimestamp.get();
-    res.setHeader("Content-Type", "application/json");
-    res.writeHead(200);
-    res.end(
-      JSON.stringify({
-        status: "ok",
-        lastImport: lastImport ?? null,
-        timestamp: new Date().toISOString(),
-      }),
-    );
-  }
-
-  private handleNotFound(res: ServerResponse): void {
-    res.writeHead(404);
-    res.end("Not Found");
-  }
-
-  private handleError(res: ServerResponse, _error: unknown): void {
-    res.writeHead(500);
-    res.end("Internal Server Error");
+  private text(res: ServerResponse, code: number, body: string): void {
+    res.writeHead(code, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end(body);
   }
 
   async start(): Promise<void> {
-    if (this.server.listening) {
-      return;
-    }
-
-    const server = this.server;
-    const port: number = this.listenPort;
-    const host: string = this.listenHost;
+    if (this.server.listening) return;
     await new Promise<void>((resolve, reject) => {
-      server.once("error", (err: Error) => {
-        console.error("Server listen error:", err);
-        reject(err);
-      });
-      server.listen(port, host, () => {
-        console.log(`Server listening on ${host}:${port}`);
+      const onError = (err: Error) => reject(err);
+      this.server.once('error', onError);
+      this.server.listen(this.port, this.host, () => {
+        this.server.off('error', onError);
+        const addr = this.server.address();
+        if (addr && typeof addr === 'object') this.port = addr.port;
         resolve();
       });
     });
   }
 
-  async stop(): Promise<void> {
-    if (!this.server.listening) {
-      return;
+  /**
+   * Stops accepting connections and waits for in-flight requests. Idle
+   * keep-alive sockets (Prometheus keeps them open) are closed immediately;
+   * remaining sockets are destroyed after `graceMs`.
+   */
+  async stop(graceMs = 5_000): Promise<void> {
+    if (!this.server.listening) return;
+    const closed = new Promise<void>(resolve => this.server.close(() => resolve()));
+    this.server.closeIdleConnections();
+    const timer = setTimeout(() => this.server.closeAllConnections(), graceMs);
+    timer.unref();
+    try {
+      await closed;
+    } finally {
+      clearTimeout(timer);
     }
-
-    await new Promise<void>((resolve, reject) => {
-      this.server.close((err?: Error) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
   }
 
   address(): string {
-    return `${this.listenHost}:${this.listenPort}`;
+    return formatHostPort(this.host, this.port);
+  }
+
+  get listening(): boolean {
+    return this.server.listening;
   }
 }
