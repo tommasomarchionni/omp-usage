@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 /**
  * Schema version for the event protocol.
@@ -9,13 +9,13 @@ export const SCHEMA_VERSION = 1 as const;
 /**
  * Supported event types. Currently only one, but extensible.
  */
-export const EventTypeSchema = z.enum(["assistant_message_end"]);
+export const EventTypeSchema = z.enum(['assistant_message_end']);
 
 /**
  * Stop reason from the OMP assistant message.
  * Matches the StopReason type from @oh-my-pi/pi-catalog/types.
  */
-export const StopReasonSchema = z.enum(["stop", "length", "toolUse", "error", "aborted"]);
+export const StopReasonSchema = z.enum(['stop', 'length', 'toolUse', 'error', 'aborted']);
 
 /**
  * Usage data as reported by OMP.
@@ -69,14 +69,19 @@ export const UsageSchema = z.object({
       acuCost: z.number().nonnegative().optional(),
     })
     .optional(),
-  /** Reported cost breakdown */
-  cost: z.object({
-    input: z.number().nonnegative(),
-    output: z.number().nonnegative(),
-    cacheRead: z.number().nonnegative(),
-    cacheWrite: z.number().nonnegative(),
-    total: z.number().nonnegative(),
-  }),
+  /**
+   * Reported cost breakdown (USD). Optional: a provider that does not report
+   * cost is recorded as "cost missing", never as zero.
+   */
+  cost: z
+    .object({
+      input: z.number().nonnegative().optional(),
+      output: z.number().nonnegative().optional(),
+      cacheRead: z.number().nonnegative().optional(),
+      cacheWrite: z.number().nonnegative().optional(),
+      total: z.number().nonnegative().optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -95,11 +100,11 @@ export const UsageEventSchema = z.object({
   /** Event type discriminator */
   eventType: EventTypeSchema,
   /** Provider name (e.g., "openrouter", "anthropic") */
-  provider: z.string().nullable(),
+  provider: z.string().max(256).nullable(),
   /** Model identifier as reported by OMP (e.g., "openrouter/free", "claude-3-opus") */
-  model: z.string().nullable(),
+  model: z.string().max(256).nullable(),
   /** API transport used (e.g., "openrouter", "anthropic-messages") */
-  api: z.string().nullable(),
+  api: z.string().max(256).nullable(),
   /** Why the generation stopped */
   stopReason: StopReasonSchema.nullable(),
   /** Usage data, or null if not reported by the provider */
@@ -116,7 +121,7 @@ export type UsageEvent = z.infer<typeof UsageEventSchema>;
  */
 export type UsageEventInput = Omit<
   UsageEvent,
-  "schemaVersion" | "eventId" | "sessionRunId" | "timestamp"
+  'schemaVersion' | 'eventId' | 'sessionRunId' | 'timestamp'
 > & {
   timestamp?: string; // Optional, will be generated if not provided
 };
@@ -132,7 +137,7 @@ export function validateEvent(data: unknown): UsageEvent {
  * Safe validation that returns a result object instead of throwing.
  */
 export function safeValidateEvent(
-  data: unknown,
+  data: unknown
 ): { success: true; data: UsageEvent } | { success: false; error: z.ZodError } {
   const result = UsageEventSchema.safeParse(data);
   if (result.success) {
