@@ -1,0 +1,957 @@
+{
+  "uid": "omp-usage-overview",
+  "title": "01 - AI Overview - Modelli, utilizzo e valore",
+  "description": "Tokens, requests, costs and exporter status at a glance.",
+  "tags": ["omp-usage", "domotommy", "ai-observability", "provisioned"],
+  "timezone": "Europe/Rome",
+  "editable": false,
+  "graphTooltip": 1,
+  "schemaVersion": 41,
+  "version": 2,
+  "refresh": "30s",
+  "time": {
+    "from": "now/d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["30s", "1m", "5m", "15m", "1h"]
+  },
+  "fiscalYearStartMonth": 0,
+  "liveNow": false,
+  "links": [
+    {
+      "title": "AI Overview",
+      "type": "link",
+      "url": "/d/omp-usage-overview",
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "title": "Navigazione AI",
+      "type": "dashboards",
+      "tags": ["ai-observability"],
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "datasource",
+        "label": "Data source",
+        "query": "prometheus",
+        "current": {
+          "text": "Prometheus",
+          "value": "prometheus"
+        },
+        "hide": 2,
+        "refresh": 1,
+        "regex": "",
+        "options": []
+      },
+      {
+        "type": "query",
+        "name": "job",
+        "label": "Job",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(omp_usage_build_info, job)",
+        "query": {
+          "query": "label_values(omp_usage_build_info, job)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "multi": false,
+        "includeAll": false,
+        "sort": 1,
+        "hide": 0,
+        "regex": "",
+        "options": [],
+        "current": {
+          "text": "omp_usage",
+          "value": "omp_usage"
+        }
+      },
+      {
+        "type": "query",
+        "name": "provider",
+        "label": "Provider",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(omp_llm_tokens_total{job=~\"$job\"}, provider)",
+        "query": {
+          "query": "label_values(omp_llm_tokens_total{job=~\"$job\"}, provider)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "sort": 1,
+        "hide": 0,
+        "regex": "",
+        "options": [],
+        "allValue": ".*",
+        "current": {
+          "text": ["All"],
+          "value": ["$__all"]
+        }
+      },
+      {
+        "type": "query",
+        "name": "model",
+        "label": "Model",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(omp_llm_tokens_total{job=~\"$job\", provider=~\"$provider\"}, model)",
+        "query": {
+          "query": "label_values(omp_llm_tokens_total{job=~\"$job\", provider=~\"$provider\"}, model)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "sort": 1,
+        "hide": 0,
+        "regex": "",
+        "options": [],
+        "allValue": ".*",
+        "current": {
+          "text": ["All"],
+          "value": ["$__all"]
+        }
+      },
+      {
+        "name": "local_provider_regex",
+        "label": "Provider locali (regex)",
+        "type": "textbox",
+        "query": "llama-kong",
+        "current": {
+          "text": "llama-kong",
+          "value": "llama-kong"
+        },
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Richieste OMP",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sum by (provider,model) (increase(omp_llm_requests_total{job=~\"$job\",provider=~\"$provider\",model=~\"$model\"}[$__range])))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "N/D"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Token output",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sum by (provider,model) (increase(omp_llm_tokens_total{job=~\"$job\",provider=~\"$provider\",model=~\"$model\",direction=\"output\"}[$__range])))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "N/D"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Costo cloud riportato",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Dato OMP, non fattura. N/D se non ci sono serie; controllare costo mancante. Esclude provider locali configurati.",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sum by (provider,model) (increase(omp_llm_reported_cost_usd_total{job=~\"$job\",provider=~\"$provider\",model=~\"$model\",provider!~\"${local_provider_regex:raw}\"}[$__range])))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "noValue": "N/D"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Risparmio equivalente locale",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Valore del consumo locale ai prezzi di riferimento correnti. Costo API locale assunto zero; energia e hardware esclusi. Non risparmio netto.",
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sum by(provider,model) (increase(omp_llm_tokens_total{job=~\"$job\",provider=~\"$provider\",model=~\"$model\",provider=~\"${local_provider_regex:raw}\"}[$__range]) * on(provider,model,direction) group_left max by(provider,model,direction) (omp_llm_price_usd_per_million_tokens{job=~\"$job\"})) / 1e6)",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "noValue": "N/D"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Token output per modello",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (provider,model) (increase(omp_llm_tokens_total{job=~\"$job\",provider=~\"$provider\",model=~\"$model\",direction=\"output\"}[$__range]))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "N/D"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Modello"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Dettaglio modello",
+                    "url": "/d/omp-usage-model?${__url_time_range}&var-provider=${__data.fields[\"Provider\"]}&var-model=${__value.raw}&var-job=omp_usage"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value": "Token output per modello",
+              "provider": "Provider",
+              "model": "Modello"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Richieste per modello",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (provider,model) (increase(omp_llm_requests_total{job=~\"$job\",provider=~\"$provider\",model=~\"$model\"}[$__range]))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "N/D"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Modello"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Dettaglio modello",
+                    "url": "/d/omp-usage-model?${__url_time_range}&var-provider=${__data.fields[\"Provider\"]}&var-model=${__value.raw}&var-job=omp_usage"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value": "Richieste per modello",
+              "provider": "Provider",
+              "model": "Modello"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Costo cloud per modello",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Solo cloud, costo riportato. Un prezzo zero non implica che il provider sia locale.",
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (provider,model) (increase(omp_llm_reported_cost_usd_total{job=~\"$job\",provider=~\"$provider\",model=~\"$model\",provider!~\"${local_provider_regex:raw}\"}[$__range]))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "noValue": "N/D"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Modello"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Dettaglio modello",
+                    "url": "/d/omp-usage-model?${__url_time_range}&var-provider=${__data.fields[\"Provider\"]}&var-model=${__value.raw}&var-job=omp_usage"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value": "Costo cloud per modello",
+              "provider": "Provider",
+              "model": "Modello"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Risparmio equivalente locale per modello",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Solo provider locali esplicitamente configurati; tariffa corrente. Direzioni senza prezzo non valorizzate.",
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(provider,model) (increase(omp_llm_tokens_total{job=~\"$job\",provider=~\"$provider\",model=~\"$model\",provider=~\"${local_provider_regex:raw}\"}[$__range]) * on(provider,model,direction) group_left max by(provider,model,direction) (omp_llm_price_usd_per_million_tokens{job=~\"$job\"})) / 1e6",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "noValue": "N/D"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Modello"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Dettaglio modello",
+                    "url": "/d/omp-usage-model?${__url_time_range}&var-provider=${__data.fields[\"Provider\"]}&var-model=${__value.raw}&var-job=omp_usage"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value": "Risparmio equivalente locale per modello",
+              "provider": "Provider",
+              "model": "Modello"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Costo API locale (assunto)",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Zero per infrastruttura locale configurata. Non include hardware o energia.",
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (provider,model) (increase(omp_llm_requests_total{job=~\"$job\",provider=~\"$provider\",model=~\"$model\",provider=~\"${local_provider_regex:raw}\"}[$__range])) * 0",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "noValue": "N/D"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Modello"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Dettaglio modello",
+                    "url": "/d/omp-usage-model?${__url_time_range}&var-provider=${__data.fields[\"Provider\"]}&var-model=${__value.raw}&var-job=omp_usage"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value": "Costo API locale (assunto)",
+              "provider": "Provider",
+              "model": "Modello"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Risposte cloud senza costo riportato",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Valore mancante non e costo zero.",
+      "gridPos": {
+        "x": 12,
+        "y": 21,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (provider,model) (increase(omp_llm_cost_missing_total{job=~\"$job\",provider=~\"$provider\",model=~\"$model\",provider!~\"${local_provider_regex:raw}\"}[$__range]))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "N/D"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Modello"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Dettaglio modello",
+                    "url": "/d/omp-usage-model?${__url_time_range}&var-provider=${__data.fields[\"Provider\"]}&var-model=${__value.raw}&var-job=omp_usage"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value": "Risposte cloud senza costo riportato",
+              "provider": "Provider",
+              "model": "Modello"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Output nel tempo per modello",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(provider,model) (rate(omp_llm_tokens_total{job=~\"$job\",provider=~\"$provider\",model=~\"$model\",direction=\"output\"}[$__rate_interval])) * 60",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: token/min",
+          "decimals": 0,
+          "noValue": "N/D"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "Token locali non valorizzati (prezzo mancante)",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Serie senza prezzo; assenza di righe significa nessuna serie non valorizzata, non un controllo dell intera storia.",
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(provider,model,direction) (increase(omp_llm_tokens_total{job=~\"$job\",provider=~\"$provider\",model=~\"$model\",provider=~\"${local_provider_regex:raw}\"}[$__range])) unless on(provider,model,direction) max by(provider,model,direction) (omp_llm_price_usd_per_million_tokens{job=~\"$job\"})",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "N/D"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Modello"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Dettaglio modello",
+                    "url": "/d/omp-usage-model?${__url_time_range}&var-provider=${__data.fields[\"Provider\"]}&var-model=${__value.raw}&var-job=omp_usage"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value": "Token locali non valorizzati (prezzo mancante)",
+              "provider": "Provider",
+              "model": "Modello"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Stato scrape: OMP / llama / Kong",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 36,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"omp_usage|llm|kong\"}",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{provider}} / {{model}}",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "N/D"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Modello"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Dettaglio modello",
+                    "url": "/d/omp-usage-model?${__url_time_range}&var-provider=${__data.fields[\"Provider\"]}&var-model=${__value.raw}&var-job=omp_usage"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value": "Stato scrape: OMP / llama / Kong",
+              "provider": "Provider",
+              "model": "Modello"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "text",
+      "title": "Come leggere la console",
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 24,
+        "h": 5
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Consumi e costi: **solo OMP**. Motore locale: prestazioni llama. Gateway: HTTP Kong. Mai sommare token OMP e llama. Reasoning e gia incluso nell output. Il locale e definito dalla regex dei provider, non da costo zero. Prezzi correnti rivalutano il periodo selezionato: non e fattura storica. Link nel menu alle dashboard specialistiche. Cache inclusa nella valorizzazione se ha un prezzo. Conteggi temporali basati sugli scrape, non sui timestamp originali degli eventi."
+      }
+    }
+  ],
+  "id": null
+}

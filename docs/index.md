@@ -2,6 +2,19 @@
 
 OMP usage tracking plugin and Prometheus exporter for [Oh My Pi](https://github.com/can1357/oh-my-pi).
 
+## Dashboard highlights (v2)
+
+The advanced dashboard bundle in `examples/grafana/dashboards-v2/` adds:
+
+- Input split between **non-cache** and **cache-read** counters.
+- Clear separation between **reported cloud cost** and **equivalent cost**.
+- A practical way to estimate **savings** when running the same model locally.
+
+See [Grafana](grafana.md) for provisioning and formulas, and
+[Grafana dashboards v2](grafana-v2.md) for screenshots and usage notes.
+
+![AI Overview v2](assets/01-ai-overview-v2.png)
+
 ## Overview
 
 This project provides two npm packages:
@@ -72,9 +85,9 @@ scrape_configs:
       - targets: ['exporter.example.internal:9464']
 ```
 
-### 4. Import the Grafana dashboard
+### 4. Import the Grafana dashboards
 
-See [Grafana](grafana.md) for the dashboard JSON.
+See [Grafana](grafana.md) and [Grafana dashboards v2](grafana-v2.md).
 
 ## Metrics
 

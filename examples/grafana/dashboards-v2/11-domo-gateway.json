@@ -1,0 +1,265 @@
+{
+  "uid": "domo-gateway",
+  "title": "11 - Gateway Kong",
+  "schemaVersion": 39,
+  "version": 2,
+  "editable": false,
+  "tags": ["domotommy", "provisioned", "ai-observability"],
+  "timezone": "Europe/Rome",
+  "refresh": "30s",
+  "time": {
+    "from": "now/d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Richieste/s",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(service)(rate(kong_http_requests_total{job=\"kong\"}[5m]))",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "Traffico HTTP attraverso Kong; non coincide con richieste LLM OMP. "
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Risposte per codice: ultime 1h",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(service,code)(increase(kong_http_requests_total{job=\"kong\"}[1h]))",
+          "legendFormat": "{{service}} / {{code}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "Traffico HTTP attraverso Kong; non coincide con richieste LLM OMP. "
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Errori autenticazione e ACL: ultime 1h",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(service,code)(increase(kong_http_requests_total{job=\"kong\",code=~\"401|403\"}[1h]))",
+          "legendFormat": "{{service}} / {{code}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "Traffico HTTP attraverso Kong; non coincide con richieste LLM OMP. "
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Rate limit 429: ultime 1h",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(service)(increase(kong_http_requests_total{job=\"kong\",code=\"429\"}[1h]))",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "Traffico HTTP attraverso Kong; non coincide con richieste LLM OMP. "
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Latenza totale p95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(service,le)(rate(kong_request_latency_ms_bucket{job=\"kong\"}[5m])))",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "Traffico HTTP attraverso Kong; non coincide con richieste LLM OMP. "
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Latenza upstream p95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(service,le)(rate(kong_upstream_latency_ms_bucket{job=\"kong\"}[5m])))",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "Traffico HTTP attraverso Kong; non coincide con richieste LLM OMP. "
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "id": null,
+  "links": [
+    {
+      "title": "AI Overview",
+      "type": "link",
+      "url": "/d/omp-usage-overview",
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "title": "Navigazione AI",
+      "type": "dashboards",
+      "tags": ["ai-observability"],
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true
+    }
+  ]
+}

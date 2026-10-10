@@ -7,6 +7,21 @@ OMP usage tracking plugin and Prometheus exporter for [Oh My Pi](https://github.
 
 Live documentation: https://tommasomarchionni.github.io/omp-usage/
 
+## Why this package: Grafana dashboards v2
+
+The repository now includes an advanced dashboard set in
+`examples/grafana/dashboards-v2/`, focused on practical cost observability:
+
+- Input tokens are split into **non-cache** and **cache-read** directions.
+- The overview highlights **cloud reported cost** and **equivalent savings** in
+  one place.
+- Model-level drilldowns show token mix, cache usage and price tables to
+  compare local inference against OpenRouter-equivalent pricing.
+
+![AI Overview v2](docs/assets/01-ai-overview-v2.png)
+![OMP usage tokens dashboard v2](docs/assets/02-omp-usage-tokens.png)
+![OMP usage model dashboard v2](docs/assets/03-omp-usage-model.png)
+
 ## Packages
 
 | Package                                 | Description                                                        |
@@ -100,7 +115,12 @@ Eleven dashboards (overview, tokens, time patterns, reported cost, equivalent
 cost and savings, reference models, efficiency, reliability, model drilldown,
 local models vs llama.cpp, exporter health) are in
 `examples/grafana/dashboards/`, with provisioning files, Prometheus rules and
-alerts in `examples/`. See [docs/grafana.md](docs/grafana.md).
+alerts in `examples/`.
+
+An advanced set is also available in `examples/grafana/dashboards-v2/`,
+including dedicated views for input/cache counters and cloud-vs-local savings
+analysis. See [docs/grafana.md](docs/grafana.md) and
+[docs/grafana-v2.md](docs/grafana-v2.md).
 
 ## Documentation
 
@@ -113,6 +133,7 @@ alerts in `examples/`. See [docs/grafana.md](docs/grafana.md).
 | Metrics                | [docs/metrics.md](docs/metrics.md)                 |
 | Prometheus             | [docs/prometheus.md](docs/prometheus.md)           |
 | Grafana                | [docs/grafana.md](docs/grafana.md)                 |
+| Grafana dashboards v2  | [docs/grafana-v2.md](docs/grafana-v2.md)           |
 | launchd (macOS)        | [docs/launchd.md](docs/launchd.md)                 |
 | Troubleshooting        | [docs/troubleshooting.md](docs/troubleshooting.md) |
 | Persistence & Recovery | [docs/persistence.md](docs/persistence.md)         |
