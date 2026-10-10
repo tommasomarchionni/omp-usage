@@ -1,44 +1,47 @@
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
+  - package-ecosystem: npm
+    directory: /
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Europe/Rome
+    # Supply-chain hygiene: wait a week before adopting a new release.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-      - "npm"
+    labels: [dependencies, npm]
     commit-message:
-      prefix: "chore(deps): "
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
     groups:
       dev-dependencies:
-        patterns:
-          - "@types/*"
-          - "typescript"
-          - "eslint*"
-          - "prettier"
-          - "vitest"
-          - "husky"
-          - "mkdocs*"
-        update-types:
-          - "minor"
-          - "patch"
+        dependency-type: development
+        update-types: [minor, patch]
       prod-dependencies:
-        patterns:
-          - "zod"
-          - "uuid"
-          - "better-sqlite3"
-          - "@prometheus-io/client"
-          - "commander"
-        update-types:
-          - "minor"
-          - "patch"
-  - package-ecosystem: "github-actions"
-    directory: "/"
+        dependency-type: production
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "github-actions"
+      interval: weekly
+      day: monday
+      timezone: Europe/Rome
+    cooldown:
+      default-days: 7
+    labels: [dependencies, github-actions]
+    commit-message:
+      prefix: 'ci(deps)'
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: pip
+    directory: /docs
+    schedule:
+      interval: monthly
+    labels: [dependencies, docs]
+    commit-message:
+      prefix: 'docs(deps)'

@@ -1,65 +1,68 @@
 name: Smoke Test
 
+# Checks a running exporter. A LAN address (e.g. 192.168.x.x) is only
+# reachable from a self-hosted runner on that network.
 on:
   workflow_dispatch:
     inputs:
       target:
-        description: "Exporter target (host:port)"
+        description: 'Exporter address host:port or [ipv6]:port'
         required: true
-        default: "exporter.example.internal:9464"
+        default: '127.0.0.1:9464'
+      runner:
+        description: 'Runner label'
+        required: true
+        type: choice
+        default: self-hosted
+        options: [self-hosted, ubuntu-latest]
 
 permissions:
   contents: read
 
 jobs:
   smoke:
-    name: Smoke Test
-    runs-on: ubuntu-latest
+    name: Smoke test ${{ inputs.target }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 5
+    env:
+      # Inputs are passed through the environment, never interpolated into
+      # the script, so they cannot inject shell commands.
+      TARGET: ${{ inputs.target }}
     steps:
-      - name: Check exporter health
+      - name: Validate target
         run: |
-          set -e
-          TARGET="${{ github.event.inputs.target }}"
-          echo "Testing exporter at $TARGET"
-          
-          # Health check
-          curl -sf "http://$TARGET/healthz" | jq -e '.status == "ok"'
-          
-          # Metrics endpoint
-          curl -sf "http://$TARGET/metrics" | grep -q "omp_llm_tokens_total"
-          
-          echo "Smoke test passed"
-      
-      - name: Verify metrics structure
-        run: |
-          set -e
-          TARGET="${{ github.event.inputs.target }}"
-          
-          METRICS=$(curl -sf "http://$TARGET/metrics")
-          
-          # Check required metrics exist
-          echo "$METRICS" | grep -q "omp_llm_tokens_total"
-          echo "$METRICS" | grep -q "omp_llm_reasoning_tokens_total"
-          echo "$METRICS" | grep -q "omp_llm_requests_total"
-          echo "$METRICS" | grep -q "omp_llm_reported_cost_usd_total"
-          echo "$METRICS" | grep -q "omp_llm_usage_missing_total"
-          
-          # Check operational metrics
-          echo "$METRICS" | grep -q "omp_usage_import_errors_total"
-          echo "$METRICS" | grep -q "omp_usage_invalid_records_total"
-          echo "$METRICS" | grep -q "omp_usage_last_import_timestamp"
-          echo "$METRICS" | grep -q "omp_usage_label_cardinality"
-          
-          echo "All required metrics present"
-      
-      - name: Test label cardinality
-        run: |
-          set -e
-          TARGET="${{ github.event.inputs.target }}"
-          
-          CARDINALITY=$(curl -sf "http://$TARGET/metrics" | grep "^omp_usage_label_cardinality" | awk '{print $2}')
-          echo "Current label cardinality: $CARDINALITY"
-          
-          if [ "$CARDINALITY" -gt 900 ]; then
-            echo "WARNING: Label cardinality ($CARDINALITY) approaching limit (1000)"
+          set -euo pipefail
+          if ! [[ "$TARGET" =~ ^([A-Za-z0-9.-]{1,253}|\[[0-9A-Fa-f:]{2,39}\]):[0-9]{1,5}$ ]]; then
+            echo "::error::Invalid target '$TARGET' (expected host:port)"
+            exit 1
           fi
+
+      - name: Health
+        run: |
+          set -euo pipefail
+          body=$(curl -fsS --max-time 10 "http://${TARGET}/healthz")
+          echo "$body"
+          echo "$body" | grep -q '"status":"ok"'
+
+      - name: Required metrics
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 10 "http://${TARGET}/metrics" -o metrics.txt
+          for m in \
+            omp_llm_tokens_total omp_llm_reasoning_tokens_total omp_llm_requests_total \
+            omp_llm_stop_reasons_total omp_llm_reported_cost_usd_total omp_llm_usage_missing_total \
+            omp_usage_invalid_records_total omp_usage_last_import_timestamp_seconds \
+            omp_usage_last_import_success omp_usage_label_cardinality omp_usage_build_info; do
+            grep -q "^# TYPE ${m} " metrics.txt || { echo "::error::missing ${m}"; exit 1; }
+          done
+          echo "All required metrics present"
+
+      - name: Freshness and cardinality
+        run: |
+          set -euo pipefail
+          last=$(awk '/^omp_usage_last_import_timestamp_seconds/ {print int($2)}' metrics.txt)
+          age=$(( $(date +%s) - last ))
+          echo "Last successful import: ${age}s ago"
+          [ "$age" -lt 300 ] || { echo "::error::last import is ${age}s old"; exit 1; }
+          overflow=$(awk '/^omp_usage_label_overflow_pairs/ {print int($2)}' metrics.txt)
+          [ "${overflow:-0}" -eq 0 ] || echo "::warning::${overflow} provider/model pairs folded into _other"

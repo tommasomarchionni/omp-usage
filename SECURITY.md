@@ -25,6 +25,17 @@ A few points are inherent to how the plugin and exporter work and are not consid
 - **Exporter HTTP endpoint.** The `/metrics` endpoint exposes aggregated Prometheus metrics. It does not expose raw events or the database. Bind to `127.0.0.1` (default) unless you explicitly configure LAN access and understand the exposure.
 - **No authentication on `/metrics`.** Prometheus scrapes are unauthenticated by design. If you expose the exporter on a shared network, consider network-level restrictions (firewall, VPN, mTLS sidecar).
 
-## Dependencies
+## Supply chain
 
-Dependencies are kept up to date automatically via [Dependabot](.github/dependabot.yml). Every CI run includes a dependency audit.
+- **Releases** are published from GitHub Actions only, with npm Trusted Publishing (OIDC). No npm token is stored in the repository, and every version carries an npm provenance attestation. Verify a package with:
+
+  ```bash
+  npm audit signatures
+  npm view @tommasomarchionni/omp-usage-exporter dist.attestations
+  ```
+
+  Versions up to `omp-usage@0.3.1` and `omp-usage-exporter@0.2.2` were published manually and have no provenance.
+- **GitHub Actions** are pinned to full commit SHAs; Dependabot updates them weekly, with a 7-day cooldown.
+- **Workflow inputs** are passed through environment variables and validated, never interpolated into shell scripts.
+- **CI** runs `npm audit --omit=dev`, `npm audit signatures`, dependency review on pull requests, CodeQL (`javascript-typescript` and `actions`) and OpenSSF Scorecard.
+- **Dependencies** are updated by [Dependabot](.github/dependabot.yml) with a 7-day cooldown.
