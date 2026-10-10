@@ -88,8 +88,11 @@ jobs:
           npm init -y >/dev/null
           npm install --no-audit --no-fund ../pkgs/*.tgz
 
-          # The internal protocol workspace must not be required at runtime
-          if grep -rqE "from ['\"]@tommasomarchionni/omp-usage-protocol" node_modules/@tommasomarchionni/*/dist; then
+          # The internal protocol workspace must not be required at runtime.
+          # Only emitted JavaScript counts: source maps embed the original sources.
+          if grep -rqE --include='*.js' --include='*.mjs' --include='*.cjs' \
+            "(from|import|require)\s*\(?\s*['\"]@tommasomarchionni/omp-usage-protocol" \
+            node_modules/@tommasomarchionni/*/dist; then
             echo "::error::a published package imports the internal protocol workspace"
             exit 1
           fi
