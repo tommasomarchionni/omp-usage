@@ -1,5 +1,5 @@
-import { createEvent, type UsageEvent, type UsageEventInput } from "@tommasomarchionni/omp-usage-protocol";
-import type { AssistantMessageEvent } from "./types.js";
+import { randomUUID } from "node:crypto";
+import type { AssistantMessageEvent, UsageEvent } from "./types.js";
 
 /**
  * Creates a usage event from an OMP assistant message event.
@@ -8,7 +8,12 @@ export function createUsageEvent(
   sessionRunId: string,
   data: AssistantMessageEvent,
 ): UsageEvent {
-  const input: UsageEventInput = {
+  const now = new Date().toISOString();
+  return {
+    schemaVersion: 1,
+    eventId: randomUUID(),
+    sessionRunId,
+    timestamp: now,
     eventType: "assistant_message_end",
     provider: data.provider,
     model: data.model,
@@ -16,9 +21,6 @@ export function createUsageEvent(
     stopReason: data.stopReason,
     usage: data.usage,
   };
-  const event = createEvent(input);
-  event.sessionRunId = sessionRunId;
-  return event;
 }
 
 /**

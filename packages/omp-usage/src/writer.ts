@@ -1,8 +1,7 @@
 import { mkdirSync, appendFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { UsageEvent } from "@tommasomarchionni/omp-usage-protocol";
-import type { PluginConfig, WriterConfig } from "./types.js";
+import type { PluginConfig, WriterConfig, UsageEvent } from "./types.js";
 import { DEFAULT_PLUGIN_CONFIG } from "./types.js";
 
 export function resolveEventsDir(configDir: string): string {

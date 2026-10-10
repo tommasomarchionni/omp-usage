@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { EventWriter, resolveEventsDir, createPluginConfig } from "./writer.js";
-import { createEvent, type UsageEvent } from "@tommasomarchionni/omp-usage-protocol";
+import type { UsageEvent } from "./types.js";
 import { rmSync, mkdirSync, existsSync, readFileSync, statSync, writeFileSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 describe("resolveEventsDir", () => {
   it("returns default path when empty", () => {
     const result = resolveEventsDir("");
@@ -72,7 +73,11 @@ describe("EventWriter", () => {
   const sessionRunId = "550e8400-e29b-41d4-a716-446655440000";
 
   const createTestEvent = (overrides: Partial<UsageEvent> = {}): UsageEvent => {
-    const base = createEvent({
+    const base: UsageEvent = {
+      schemaVersion: 1,
+      eventId: randomUUID(),
+      sessionRunId,
+      timestamp: new Date().toISOString(),
       eventType: "assistant_message_end",
       provider: "openrouter",
       model: "openrouter/free",
@@ -81,9 +86,12 @@ describe("EventWriter", () => {
       usage: {
         input: 100,
         output: 50,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 150,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
       },
-    });
+    };
     return { ...base, ...overrides, sessionRunId };
   };
 

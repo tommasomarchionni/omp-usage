@@ -43,6 +43,21 @@ export interface Usage {
   };
 }
 
+export type UsageEventType = "assistant_message_end";
+
+export interface UsageEvent {
+  schemaVersion: number;
+  eventId: string;
+  sessionRunId: string;
+  timestamp: string;
+  eventType: UsageEventType;
+  provider: string | null;
+  model: string | null;
+  api: string | null;
+  stopReason: StopReason | null;
+  usage: Usage | null;
+}
+
 export interface PluginConfig {
   eventsDir: string;
   maxQueueSize: number;
