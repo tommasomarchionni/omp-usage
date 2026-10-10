@@ -50,6 +50,7 @@ nav:
   - Pricing & Equivalent Cost: pricing.md
   - Prometheus: prometheus.md
   - Grafana: grafana.md
+  - Grafana dashboards v2: grafana-v2.md
   - launchd (macOS): launchd.md
   - Troubleshooting: troubleshooting.md
   - Persistence & Recovery: persistence.md
