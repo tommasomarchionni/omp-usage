@@ -21,21 +21,17 @@ Live documentation: https://tommasomarchionni.github.io/omp-usage/
 Install with OMP CLI:
 
 ```bash
-omp plugin install @tommasomarchionni/omp-usage --scope=user
+omp plugin install @tommasomarchionni/omp-usage
 omp plugin list
 ```
 
 Uninstall when needed:
 
 ```bash
-omp plugin uninstall @tommasomarchionni/omp-usage --scope=user
+omp plugin uninstall @tommasomarchionni/omp-usage
 ```
 
-Project-scoped install (writes into the current project plugin scope):
-
-```bash
-omp plugin install @tommasomarchionni/omp-usage --scope=project
-```
+Note: `--scope` is only supported for marketplace installs (`name@marketplace`), not npm package specs.
 
 If you prefer manual configuration, add to your OMP config:
 

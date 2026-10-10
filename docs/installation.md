@@ -11,21 +11,17 @@
 ### From npm (when published)
 
 ```bash
-omp plugin install @tommasomarchionni/omp-usage --scope=user
+omp plugin install @tommasomarchionni/omp-usage
 omp plugin list
 ```
 
 Uninstall:
 
 ```bash
-omp plugin uninstall @tommasomarchionni/omp-usage --scope=user
+omp plugin uninstall @tommasomarchionni/omp-usage
 ```
 
-Install only for the current project:
-
-```bash
-omp plugin install @tommasomarchionni/omp-usage --scope=project
-```
+Note: `--scope` is currently supported by OMP only for marketplace installs (`name@marketplace`), not npm package specs.
 
 Then add to your OMP configuration:
 
@@ -59,8 +55,8 @@ Then add to your OMP configuration:
 Optional local-link workflow with OMP CLI:
 
 ```bash
-omp plugin link /path/to/omp-usage/packages/omp-usage/dist/index.js --scope=project
-omp plugin uninstall /path/to/omp-usage/packages/omp-usage/dist/index.js --scope=project
+omp plugin link /path/to/omp-usage/packages/omp-usage/dist/index.js
+omp plugin uninstall /path/to/omp-usage/packages/omp-usage/dist/index.js
 ```
 
 ## Exporter Installation

@@ -38,7 +38,7 @@ This project provides two npm packages:
 Install with OMP CLI:
 
 ```bash
-omp plugin install @tommasomarchionni/omp-usage --scope=user
+omp plugin install @tommasomarchionni/omp-usage
 omp plugin list
 ```
 
