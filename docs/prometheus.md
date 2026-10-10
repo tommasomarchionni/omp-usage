@@ -108,7 +108,7 @@ groups:
           description: "Current cardinality: {{ $value }} (limit: 1000)"
 
       - alert: OMPUsageNoRecentImport
-        expr: time() - omp_usage_last_import_timestamp > 300
+        expr: time() - omp_usage_last_import_timestamp_seconds > 300
         for: 5m
         labels:
           severity: warning

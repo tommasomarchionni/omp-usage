@@ -32,65 +32,26 @@ Not verified:
 
 ## Exporter Shutdown
 
-The exporter handles `SIGINT` and `SIGTERM`:
+On `SIGINT` or `SIGTERM` the exporter runs these steps in order, once:
 
-```
-SIGINT/SIGTERM received
-        │
-        ▼
-┌───────────────────┐
-│ Stop HTTP server  │ ──▶ Stop accepting new connections
-│ (30s timeout)     │     Finish in-flight requests
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│ Stop Importer     │ ──▶ Finish current batch
-│                   │     Don't start new files
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│ Close Database    │ ──▶ Flush WAL
-│                   │     Close file handles
-└───────────────────┘
-        │
-        ▼
-   Exit 0
-```
+1. **HTTP**: stop accepting connections, close idle keep-alive sockets immediately (Prometheus keeps them open), let in-flight scrapes finish, destroy remaining sockets after `min(5 s, timeout/2)`.
+2. **Importer**: stop timers and the file watcher, then wait for the in-flight batch to commit. No transaction is left open, and the cursor always points just after the last committed line.
+3. **Database**: `wal_checkpoint(TRUNCATE)`, close SQLite, release the `.lock` file.
+4. Exit with code 0.
 
-### Shutdown Timeout
+If the sequence exceeds `--shutdown-timeout-ms` (default 10 s) the process exits with code 1. A second signal during shutdown forces an immediate exit.
 
-- **Default**: 30 seconds
-- **Configurable**: Not in v1 (hardcoded)
-- **Force exit**: After timeout, process exits with code 1
+`uncaughtException` triggers the same sequence and exits with code 1.
 
-### Signal Handling
+### Crash safety
 
-```bash
-# Graceful stop (SIGTERM)
-kill <pid>
-# Or
-launchctl stop com.tommasomarchionni.omp-usage-exporter
-# Or
-systemctl stop omp-usage-exporter
+`SIGKILL`, power loss or a crash never corrupts counts:
 
-# Force stop (SIGKILL) - avoid if possible
-kill -9 <pid>
-```
+- A batch is committed atomically or not at all (SQLite WAL, `synchronous=NORMAL`).
+- After restart the importer resumes from the last committed cursor.
+- Lines re-read after a crash are deduplicated by `eventId`.
 
-### In-Flight Request Handling
-
-- `/metrics` requests: Allowed to complete (typically < 100ms)
-- `/healthz` requests: Allowed to complete
-- New requests: Rejected after server stop
-
-### Database Integrity
-
-- SQLite WAL mode ensures durability
-- `PRAGMA synchronous = NORMAL` (balance of safety/performance)
-- On clean shutdown: WAL checkpointed, database consistent
-- On crash: WAL replay on next open (automatic)
+The integration suite kills the exporter with `SIGTERM` and `SIGKILL` during a 20 000-event import. It then checks that the totals after restart are exact.
 
 ## Verification
 
@@ -117,7 +78,7 @@ tail -n 1 ~/.local/state/omp-usage/events/*.jsonl | jq .timestamp
 ## Best Practices
 
 1. **Always use graceful shutdown** (SIGTERM, not SIGKILL)
-2. **Allow 30s for shutdown** in process managers
+2. **Allow more than `--shutdown-timeout-ms`** in process managers
 3. **Monitor shutdown duration** in logs
 4. **Test shutdown** regularly in staging
 5. **Don't kill -9** unless process is truly stuck
@@ -127,10 +88,8 @@ tail -n 1 ~/.local/state/omp-usage/events/*.jsonl | jq .timestamp
 ### systemd
 ```ini
 [Service]
-ExecStop=/usr/local/bin/omp-usage-exporter --shutdown
-TimeoutStopSec=30
 KillSignal=SIGTERM
-SendSIGKILL=yes
+TimeoutStopSec=20
 ```
 
 ### launchd
@@ -155,7 +114,7 @@ STOPSIGNAL SIGTERM
 | Component | Data at Risk |
 |-----------|--------------|
 | Plugin queue | Up to `maxQueueSize` events (default 1000) |
-| Exporter batch | Current batch (≤ 100 events) |
+| Exporter batch | Nothing: uncommitted lines are re-read after restart |
 | SQLite WAL | Uncheckpointed pages (recovered on next open) |
 | HTTP requests | In-flight `/metrics` responses (client gets error) |
 

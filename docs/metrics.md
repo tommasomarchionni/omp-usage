@@ -1,173 +1,84 @@
 # Metrics Reference
 
-## LLM Metrics
+All metrics carry the default label `app="omp-usage-exporter"`; Prometheus adds `job` and `instance`.
 
-All LLM metrics are **Counters** (monotonically increasing).
+LLM counters are computed from the SQLite aggregates on every scrape. They are monotonic, survive exporter restarts and never double count re-imported files.
 
-### `omp_llm_tokens_total`
+## LLM metrics
 
-Total tokens by provider, model, and direction.
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `omp_llm_tokens_total` | counter | `provider`, `model`, `direction` | Tokens by direction: `input`, `output`, `cache_read`, `cache_write` |
+| `omp_llm_reasoning_tokens_total` | counter | `provider`, `model` | Reasoning/thinking tokens. **Subset of `output`**, never add them to output |
+| `omp_llm_requests_total` | counter | `provider`, `model`, `status` | Assistant messages: `success`, `error` (`stopReason=error`), `aborted` |
+| `omp_llm_stop_reasons_total` | counter | `provider`, `model`, `stop_reason` | Assistant messages by raw stop reason (`stop`, `length`, `toolUse`, `error`, `aborted`, `unknown`, …) |
+| `omp_llm_reported_cost_usd_total` | counter | `provider`, `model` | Cost reported by the provider through OMP, in USD |
+| `omp_llm_usage_missing_total` | counter | `provider`, `model` | Messages without usage (`usage: null`) |
+| `omp_llm_cost_missing_total` | counter | `provider`, `model` | Messages with usage but without a reported cost |
 
-| Label | Values |
-|-------|--------|
-| `provider` | Provider name (sanitized) |
-| `model` | Model identifier (sanitized) |
-| `direction` | `input`, `output`, `cache_read`, `cache_write` |
-
-**Accounting rules:**
-- `input` = non-cached conversation input tokens
-- `output` = total conversation output tokens (includes reasoning)
-- `cache_read` = tokens read from prompt cache
-- `cache_write` = tokens written to prompt cache
-- Reasoning tokens are **not** added to output again (already included)
-
-### `omp_llm_reasoning_tokens_total`
-
-Total reasoning/thinking tokens by provider and model.
-
-| Label | Values |
-|-------|--------|
-| `provider` | Provider name |
-| `model` | Model identifier |
-
-Only incremented when provider reports `reasoningTokens`.
-
-### `omp_llm_requests_total`
-
-Total requests by provider, model, and status.
-
-| Label | Values |
-|-------|--------|
-| `provider` | Provider name |
-| `model` | Model identifier |
-| `status` | `success`, `error` |
-
-**Accounting rules:**
-- `stopReason = "error"` → `status="error"`
-- `stopReason = "stop" | "length" | "toolUse" | "aborted"` → `status="success"`
-- Error with non-zero usage: tokens counted + error request counted
-
-### `omp_llm_reported_cost_usd_total`
-
-Total reported cost in USD by provider and model.
-
-| Label | Values |
-|-------|--------|
-| `provider` | Provider name |
-| `model` | Model identifier |
-
-**Note:** Reported cost ≠ invoice. Do not use for billing without verification.
-
-### `omp_llm_usage_missing_total`
-
-Count of events where usage was not reported (null).
-
-| Label | Values |
-|-------|--------|
-| `provider` | Provider name |
-| `model` | Model identifier |
-
-## Operational Metrics
-
-### `omp_usage_import_errors_total`
-
-Total import errors by reason.
-
-| Label | Values |
-|-------|--------|
-| `reason` | `malformed`, `unknown_schema`, `line_too_long`, `io` |
-
-### `omp_usage_invalid_records_total`
-
-Total invalid records by reason.
-
-| Label | Values |
-|-------|--------|
-| `reason` | `schema_validation`, `negative_value`, `nan_value` |
-
-### `omp_usage_last_import_timestamp`
-
-Unix timestamp of last successful import (Gauge).
-
-### `omp_usage_label_cardinality`
-
-Current number of unique (provider, model) label pairs (Gauge).
-
-## Cardinality Management
-
-The exporter limits unique (provider, model) label pairs to `maxLabelCardinality` (default 1000).
-
-- **Under limit**: Each pair gets its own label set
-- **Over limit**: Excess pairs aggregated into `_other` bucket
-- **Events NOT dropped**: All events stored in SQLite, only label cardinality limited
-- **Alert**: Monitor `omp_usage_label_cardinality` approaching limit
-
-## Label Sanitization
-
-Prometheus label values must match `[a-zA-Z0-9_:]`. The exporter:
-1. Replaces invalid chars with `_`
-2. Trims leading/trailing `_`
-3. Truncates to 256 characters
-
-Example: `openrouter/free` → `openrouter_free`
-
-## PromQL Examples
-
-### Total tokens by provider
-```promql
-sum by (provider) (rate(omp_llm_tokens_total[5m]))
-```
-
-### Total tokens by model (input vs output)
-```promql
-sum by (model, direction) (rate(omp_llm_tokens_total[5m]))
-```
-
-### Error rate by provider
-```promql
-sum by (provider) (rate(omp_llm_requests_total{status="error"}[5m]))
-/
-sum by (provider) (rate(omp_llm_requests_total[5m]))
-```
-
-### Cost per model
-```promql
-rate(omp_llm_reported_cost_usd_total[1h])
-```
-
-### Missing usage rate
-```promql
-rate(omp_llm_usage_missing_total[5m])
-```
-
-### Import health
-```promql
-# Errors in last 5 minutes
-increase(omp_usage_import_errors_total[5m])
-
-# Time since last import
-time() - omp_usage_last_import_timestamp
-```
-
-## Accounting Rules Summary
+### Accounting rules
 
 | Rule | Implementation |
-|------|----------------|
-| Reasoning ⊆ output | `reasoningTokens` never added to `output` |
-| No totalTokens double-count | `totalTokens` not summed into input/output |
-| Error counts as request | `stopReason="error"` → `requests_error++` |
-| Missing usage ≠ zero | `usage=null` → `usage_missing++`, tokens not counted |
-| Error with usage | Tokens counted + error request counted |
-| Reported cost ≠ invoice | Stored separately, no automatic tariff |
-| `increase()` aligns to scrape | Not event timestamp (Prometheus semantics) |
-| Historical import ≠ backfill | Prometheus doesn't reconstruct history |
-| OMP + llama.cpp | Don't double-count; separate tracking |
+|---|---|
+| Reasoning ⊆ output | `reasoningTokens` is exported separately and never added to `output` |
+| No `totalTokens` double count | `totalTokens` is stored but not exported |
+| Error is a failed attempt | `stopReason="error"` → `status="error"`; tokens reported with an error are still counted |
+| Missing ≠ zero | `usage: null` increments `usage_missing`, a missing cost increments `cost_missing` |
+| Reported cost ≠ invoice | Free tiers report 0; routers may report estimates |
+| Router aliases | `openrouter/free` is exported as `openrouter/free`; the underlying model is not guessed |
+| `increase()` follows scrapes | Prometheus attributes increments to scrape time, not to the original event timestamp |
+| Importing old JSONL is not a backfill | Old events appear as a step at the time they are first imported |
+| OMP vs llama.cpp | Local generations may appear in both; never sum the two |
 
-## Cost Interpretation
+### Label values
 
-| Cost Field | Meaning |
-|------------|---------|
-| `reported_cost_usd` | What the provider reported (may be $0 for free tiers) |
-| `equivalent_cost_usd` | Computed from tokens × tariff (not implemented in v1) |
+Label values are exported verbatim: `openrouter/free`, `qwen3.6-35b-a3b:Q4_K_M` and `llama.cpp` are all valid Prometheus label values. Control characters are replaced with `_` and values are truncated to 128 characters.
 
-**v1 does not implement automatic tariff application.** Use reported cost as lower bound; compute equivalent cost externally if needed.
+Upgrading from 0.2.x: older versions replaced `/`, `-` and `.` with `_` (`openrouter/free` → `openrouter_free`). Dashboards or rules matching the old values must be updated. Prometheus treats the new values as new series.
+
+### Cardinality limit
+
+At most `--max-label-cardinality` (default 1000) distinct `(provider, model)` pairs are exported, in first-seen order. Usage of additional pairs is still stored and counted, folded into `provider="_other", model="_other"`. Watch `omp_usage_label_overflow_pairs > 0`.
+
+## Operational metrics
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `omp_usage_events_imported_total` | counter | | Events stored in the database |
+| `omp_usage_invalid_records_total` | counter | `reason` | Skipped lines: `invalid_json`, `invalid_schema`, `unknown_schema_version`, `line_too_long`, `invalid_utf8` (persisted) |
+| `omp_usage_import_errors_total` | counter | `reason` | Failed file imports since process start: `io`, `database`, `other` |
+| `omp_usage_file_resets_total` | counter | `reason` | Files re-read from offset 0: `replaced`, `truncated`, `rewritten` |
+| `omp_usage_last_import_timestamp_seconds` | gauge | | Unix time of the last successful cycle (0 before the first) |
+| `omp_usage_last_import_success` | gauge | | 1 if the last cycle had no file errors |
+| `omp_usage_last_import_duration_seconds` | gauge | | Duration of the last cycle |
+| `omp_usage_files_tracked` | gauge | | Files with a cursor |
+| `omp_usage_label_cardinality` | gauge | | Exported `(provider, model)` pairs |
+| `omp_usage_label_overflow_pairs` | gauge | | Pairs folded into `_other` |
+| `omp_usage_build_info` | gauge | `version`, `node_version` | Always 1 |
+| `omp_usage_process_*`, `omp_usage_nodejs_*` | various | | Standard Node.js process metrics |
+
+`omp_usage_last_import_timestamp` (without `_seconds`) from 0.2.x was renamed.
+
+## PromQL examples
+
+```promql
+# Tokens per model over the selected Grafana range
+sum by (model) (increase(omp_llm_tokens_total[$__range]))
+
+# Input vs output rate
+sum by (direction) (rate(omp_llm_tokens_total[5m]))
+
+# Error ratio per provider
+sum by (provider) (rate(omp_llm_requests_total{status="error"}[15m]))
+  / sum by (provider) (rate(omp_llm_requests_total[15m]))
+
+# Prompt cache hit ratio
+sum(rate(omp_llm_tokens_total{direction="cache_read"}[1h]))
+  / sum(rate(omp_llm_tokens_total{direction=~"input|cache_read"}[1h]))
+
+# Reported cost in the last 24 hours
+sum(increase(omp_llm_reported_cost_usd_total[24h]))
+
+# Exporter freshness
+time() - omp_usage_last_import_timestamp_seconds
+```
