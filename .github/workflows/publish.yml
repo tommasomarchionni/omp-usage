@@ -26,6 +26,19 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+      - name: Validate NPM_TOKEN identity
+        env:
+          NPM_FALLBACK_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NPM_FALLBACK_TOKEN:-}" ]; then
+            echo "NPM_TOKEN not configured."
+            exit 0
+          fi
+
+          temp_npmrc="$(mktemp)"
+          printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_FALLBACK_TOKEN" > "$temp_npmrc"
+          NPM_CONFIG_USERCONFIG="$temp_npmrc" npm whoami
+          rm -f "$temp_npmrc"
       - name: Publish plugin package (OIDC, fallback to NPM_TOKEN)
         working-directory: packages/omp-usage
         env:
@@ -65,6 +78,19 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+      - name: Validate NPM_TOKEN identity
+        env:
+          NPM_FALLBACK_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NPM_FALLBACK_TOKEN:-}" ]; then
+            echo "NPM_TOKEN not configured."
+            exit 0
+          fi
+
+          temp_npmrc="$(mktemp)"
+          printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_FALLBACK_TOKEN" > "$temp_npmrc"
+          NPM_CONFIG_USERCONFIG="$temp_npmrc" npm whoami
+          rm -f "$temp_npmrc"
       - name: Publish exporter package (OIDC, fallback to NPM_TOKEN)
         working-directory: packages/omp-usage-exporter
         env:
