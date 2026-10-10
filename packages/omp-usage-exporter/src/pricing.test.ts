@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { existsSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ExporterDatabase } from './database.js';
 import { createExporterState, createMetrics } from './metrics.js';
@@ -11,6 +11,7 @@ import {
   perTokenToPerMillion,
   PricingConfigError,
   PricingService,
+  readRegularFile,
   resolvePricing,
   type PriceTable,
 } from './pricing.js';
@@ -236,6 +237,34 @@ describe('resolvePricing', () => {
   });
 });
 
+describe('readRegularFile', () => {
+  let dir: ReturnType<typeof tempDir>;
+  beforeEach(() => {
+    dir = tempDir();
+  });
+  afterEach(() => dir.cleanup());
+
+  it('reads a regular file and returns its mtime', () => {
+    const f = join(dir.path, 'a.json');
+    writeFileSync(f, '{"a":1}');
+    const r = readRegularFile(f, 100, true);
+    expect(r).toEqual({ text: '{"a":1}', mtimeMs: statSync(f).mtimeMs });
+  });
+
+  it('refuses directories, oversized files and (with noFollow) symlinks', () => {
+    const d = join(dir.path, 'd');
+    mkdirSync(d);
+    expect(readRegularFile(d, 100, false)).toBe('not a regular file');
+    const f = join(dir.path, 'big');
+    writeFileSync(f, 'x'.repeat(101));
+    expect(readRegularFile(f, 100, false)).toBe('file too large');
+    const link = join(dir.path, 'link');
+    symlinkSync(f, link);
+    expect(() => readRegularFile(link, 1000, true)).toThrow(/ELOOP|symbolic/);
+    expect(typeof readRegularFile(link, 1000, false)).toBe('object');
+  });
+});
+
 describe('OpenRouterCatalog', () => {
   let dir: ReturnType<typeof tempDir>;
   beforeEach(() => (dir = tempDir()));
@@ -254,9 +283,11 @@ describe('OpenRouterCatalog', () => {
     await c.refreshIfStale();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(c.get('qwen/qwen3.6-35b-a3b')?.input).toBe(0.15);
+    const cached = readRegularFile(cacheFile, 1 << 20, true);
+    if (typeof cached === 'string') throw new Error(cached);
     expect(statSync(cacheFile).mode & 0o777).toBe(0o600);
     // Only prices are cached, nothing else from the response.
-    expect(readFileSync(cacheFile, 'utf8')).not.toContain('hugging_face_id');
+    expect(cached.text).not.toContain('hugging_face_id');
 
     const offline = vi.fn(async () => {
       throw new Error('offline');
