@@ -7,13 +7,13 @@
   "author": "Tommaso Marchionni",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tommasomarchionni/omp-usage.git",
+    "url": "git+https://github.com/tommasomarchionni/omp-usage.git",
     "directory": "packages/omp-usage-exporter"
   },
   "main": "./dist/cli.js",
   "types": "./dist/cli.d.ts",
   "bin": {
-    "omp-usage-exporter": "./dist/cli.js"
+    "omp-usage-exporter": "dist/cli.js"
   },
   "exports": {
     "./package.json": "./package.json",
