@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/tommasomarchionni/omp-usage/compare/omp-usage-exporter-v0.2.0...omp-usage-exporter-v0.2.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* update repository URL format to use git+ protocol ([0f83a1b](https://github.com/tommasomarchionni/omp-usage/commit/0f83a1b33e718c800687b4fd40b7be44b31c4471))
+
 ## [0.2.0](https://github.com/tommasomarchionni/omp-usage/compare/omp-usage-exporter-v0.1.0...omp-usage-exporter-v0.2.0) (2026-10-09)
 
 
