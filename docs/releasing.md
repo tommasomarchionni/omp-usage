@@ -45,7 +45,7 @@ Without a matching Trusted Publisher npm answers `E404 Not Found - PUT` even tho
 
 ### 4. Code security
 
-**Settings → Code security**: enable Dependabot alerts, Dependabot security updates and private vulnerability reporting. Secret scanning and push protection are already enabled.
+**Settings → Code security**: enable the **Dependency graph** (required by the `Dependency review` check, which fails until it is on), Dependabot alerts, Dependabot security updates and private vulnerability reporting. Secret scanning and push protection are already enabled.
 
 ## Verifying a published package
 
