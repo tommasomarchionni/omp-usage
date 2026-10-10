@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/tommasomarchionni/omp-usage/compare/omp-usage-v0.2.1...omp-usage-v0.3.0) (2026-10-10)
+
+
+### Features
+
+* **plugin:** add configurable retention and runtime omp-usage commands ([00e6f31](https://github.com/tommasomarchionni/omp-usage/commit/00e6f31e5b8fe685688b3b6ca645a3f856329cf5))
+
+
+### Bug Fixes
+
+* **plugin:** export valid OMP factory and correct install docs ([818dea3](https://github.com/tommasomarchionni/omp-usage/commit/818dea3179cfda07be374b38312f965dd6997465))
+
 ## [0.2.1](https://github.com/tommasomarchionni/omp-usage/compare/omp-usage-v0.2.0...omp-usage-v0.2.1) (2026-10-10)
 
 
