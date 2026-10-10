@@ -9,6 +9,13 @@ Thanks for considering a contribution to this project.
 - **Documentation**: the docs live in `docs/` and are built with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/). Typo fixes and clarifications are always welcome.
 - **Code**: see the workflow below.
 
+## AI coding agents
+
+Instructions for AI agents (Copilot, Codex, Claude, Gemini, Oh My Pi) are in
+[AGENTS.md](AGENTS.md), with a short summary for Copilot in
+[.github/copilot-instructions.md](.github/copilot-instructions.md). Update them
+when project rules or status change.
+
 ## Development setup
 
 ```bash
