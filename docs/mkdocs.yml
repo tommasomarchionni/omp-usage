@@ -7,6 +7,8 @@ repo_name: tommasomarchionni/omp-usage
 edit_uri: edit/main/docs/
 copyright: Copyright &copy; 2026 Tommaso Marchionni
 docs_dir: .
+exclude_docs: |
+  requirements.txt
 site_dir: ../site
 
 theme:
@@ -45,6 +47,7 @@ nav:
   - Plugin: plugin.md
   - Exporter: exporter.md
   - Metrics: metrics.md
+  - Pricing & Equivalent Cost: pricing.md
   - Prometheus: prometheus.md
   - Grafana: grafana.md
   - launchd (macOS): launchd.md
@@ -52,6 +55,7 @@ nav:
   - Persistence & Recovery: persistence.md
   - Shutdown: shutdown.md
   - Testing: testing.md
+  - Releasing & Security: releasing.md
 
 extra:
   social:

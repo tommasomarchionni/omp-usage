@@ -1,0 +1,25 @@
+# Example scrape configuration. 192.168.188.50 is the Mac running the exporter
+# in the documentation examples: replace it with your host.
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+rule_files:
+  - rules/omp-usage.rules.yml
+  - rules/omp-usage.alerts.yml
+
+scrape_configs:
+  # omp-usage-exporter, started with --listen 0.0.0.0:9464 (or the LAN address)
+  - job_name: omp_usage
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['192.168.188.50:9464']
+        labels:
+          host: mac
+
+  # Existing llama.cpp server (llama-server --metrics). Kept as its own job:
+  # never sum its tokens with omp_llm_tokens_total.
+  - job_name: llm
+    static_configs:
+      - targets: ['192.168.188.50:8080']

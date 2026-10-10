@@ -39,3 +39,9 @@ coverage/
 
 # Package tarballs
 *.tgz
+# MkDocs output
+site/
+
+# Python
+__pycache__/
+.venv/

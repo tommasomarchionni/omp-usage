@@ -23,6 +23,9 @@ omp-usage-exporter [options]
   --max-label-cardinality <n>    maximum exported (provider, model) pairs [env OMP_USAGE_MAX_LABEL_CARDINALITY]
   --poll-interval-ms <ms>        interval between import cycles [env OMP_USAGE_POLL_INTERVAL_MS]
   --shutdown-timeout-ms <ms>     graceful shutdown budget [env OMP_USAGE_SHUTDOWN_TIMEOUT_MS]
+  --retention-days <days>        delete fully imported, idle event files [env OMP_USAGE_EXPORTER_RETENTION_DAYS]
+  --pricing-file <path>          price tables for equivalent cost [env OMP_USAGE_PRICING_FILE]
+  --print-prices                 resolve the pricing file, print prices as JSON and exit
   --no-watch                     polling only (network filesystems)
   --config-check                 validate configuration, print it as JSON and exit
   --import-once                  run a single import cycle and exit
@@ -32,23 +35,23 @@ omp-usage-exporter [options]
   -h, --help                     show help
 ```
 
-Exit codes: `0` success, `1` runtime failure (locked database, listen error, import errors with `--import-once`, shutdown timeout), `2` invalid configuration or arguments.
+Exit codes: `0` success, `1` runtime failure (locked database, listen error, import errors with `--import-once`, shutdown timeout), `2` invalid configuration, arguments or pricing file, `3` (`--print-prices`) a configured price could not be resolved.
 
 ## Import guarantees
 
-| Situation | Behavior |
-|---|---|
-| Lines appended | Only the new bytes are read |
-| Trailing line without `\n` | Left in place; imported once the writer completes it |
+| Situation                                                              | Behavior                                                                            |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Lines appended                                                         | Only the new bytes are read                                                         |
+| Trailing line without `\n`                                             | Left in place; imported once the writer completes it                                |
 | Invalid JSON, schema violation, unknown `schemaVersion`, invalid UTF-8 | Skipped, counted once in `omp_usage_invalid_records_total{reason}`, cursor advances |
-| Line longer than `--max-line-length` | Skipped without being loaded in memory, counted as `line_too_long` |
-| Blank line | Ignored |
-| File truncated (`size < offset`) | Re-read from offset 0 |
-| File replaced (different inode/device) | Re-read from offset 0 |
-| File rewritten in place (bytes before the cursor changed) | Detected with a SHA-256 of the 256 bytes before the cursor and re-read from 0 |
-| File renamed | Treated as a new path, re-read from 0 |
-| File deleted | Cursor kept, no error |
-| Symlink or non-regular file inside the events directory | Ignored with a warning (opened with `O_NOFOLLOW`) |
+| Line longer than `--max-line-length`                                   | Skipped without being loaded in memory, counted as `line_too_long`                  |
+| Blank line                                                             | Ignored                                                                             |
+| File truncated (`size < offset`)                                       | Re-read from offset 0                                                               |
+| File replaced (different inode/device)                                 | Re-read from offset 0                                                               |
+| File rewritten in place (bytes before the cursor changed)              | Detected with a SHA-256 of the 256 bytes before the cursor and re-read from 0       |
+| File renamed                                                           | Treated as a new path, re-read from 0                                               |
+| File deleted                                                           | Cursor kept, no error                                                               |
+| Symlink or non-regular file inside the events directory                | Ignored with a warning (opened with `O_NOFOLLOW`)                                   |
 
 Every re-read is safe: `eventId` has a `UNIQUE` constraint and duplicates never update aggregates. Re-reads are counted in `omp_usage_file_resets_total{reason}`.
 
@@ -64,13 +67,13 @@ The main database stays readable while the exporter runs, for example with `sqli
 
 `PRAGMA user_version` stores the schema version (currently `2`). Migrations run automatically at startup inside a transaction. A database written by a newer exporter is refused instead of being modified.
 
-| Table | Content |
-|---|---|
-| `events` | One row per event (`event_id` UNIQUE), flattened usage fields, validated JSON |
-| `cursors` | `file_path`, `offset`, `file_size`, `inode`, `device`, `mtime_ms`, `tail_hash` |
-| `aggregates` | Per `(provider, model)`: tokens, reasoning, requests by status, reported cost, usage/cost missing |
-| `stop_reason_aggregates` | Per `(provider, model, stop_reason)` counts |
-| `invalid_records` | Skipped lines by reason |
+| Table                    | Content                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------- |
+| `events`                 | One row per event (`event_id` UNIQUE), flattened usage fields, validated JSON                     |
+| `cursors`                | `file_path`, `offset`, `file_size`, `inode`, `device`, `mtime_ms`, `tail_hash`                    |
+| `aggregates`             | Per `(provider, model)`: tokens, reasoning, requests by status, reported cost, usage/cost missing |
+| `stop_reason_aggregates` | Per `(provider, model, stop_reason)` counts                                                       |
+| `invalid_records`        | Skipped lines by reason                                                                           |
 
 Events without a provider or model are aggregated under the label value `unknown`. The `events` row keeps `NULL`.
 
@@ -97,11 +100,11 @@ Prometheus text format. See [Metrics](metrics.md).
 }
 ```
 
-| `status` | HTTP | Meaning |
-|---|---|---|
-| `ok` | 200 | Database reachable, last cycle succeeded recently |
-| `degraded` | 503 | Last cycle had file errors, or no success for `max(3 × poll interval, 60 s)` |
-| `unavailable` | 503 | Database not usable |
+| `status`      | HTTP | Meaning                                                                      |
+| ------------- | ---- | ---------------------------------------------------------------------------- |
+| `ok`          | 200  | Database reachable, last cycle succeeded recently                            |
+| `degraded`    | 503  | Last cycle had file errors, or no success for `max(3 × poll interval, 60 s)` |
+| `unavailable` | 503  | Database not usable                                                          |
 
 ## Network exposure
 
@@ -109,12 +112,12 @@ The default listener is `127.0.0.1:9464`. Binding any non-loopback address logs 
 
 ## Performance
 
-| Aspect | Value |
-|---|---|
-| Batch size | 500 lines per transaction, yielding to the event loop between batches |
-| Read buffer | 64 KiB; memory per line bounded by `--max-line-length` |
-| Scrape cost | One aggregate query per scrape (one row per provider/model) |
-| Database size | ~1 KB per event |
+| Aspect        | Value                                                                 |
+| ------------- | --------------------------------------------------------------------- |
+| Batch size    | 500 lines per transaction, yielding to the event loop between batches |
+| Read buffer   | 64 KiB; memory per line bounded by `--max-line-length`                |
+| Scrape cost   | One aggregate query per scrape (one row per provider/model)           |
+| Database size | ~1 KB per event                                                       |
 
 ## Troubleshooting
 

@@ -1,0 +1,32 @@
+{
+  "$schema": "./pricing.schema.json",
+  "openrouter": {
+    "enabled": true,
+    "refreshHours": 24
+  },
+  "models": [
+    {
+      "provider": "llama.cpp",
+      "model": "qwen3.6-35b-a3b",
+      "openrouter": "qwen/qwen3.6-35b-a3b"
+    },
+    {
+      "provider": "llama.cpp",
+      "model": "qwen3.6-27b",
+      "openrouter": "qwen/qwen3.6-27b",
+      "prices": { "cacheRead": 0.032 }
+    },
+    {
+      "provider": "ollama",
+      "model": "my-finetune",
+      "prices": { "input": 0.1, "output": 0.4, "cacheRead": 0.01, "cacheWrite": 0 }
+    }
+  ],
+  "references": [
+    "anthropic/claude-sonnet-4.5",
+    "openai/gpt-5",
+    "openai/gpt-5-mini",
+    "qwen/qwen3.6-35b-a3b",
+    { "name": "electricity-only", "prices": { "input": 0, "output": 0.02 } }
+  ]
+}

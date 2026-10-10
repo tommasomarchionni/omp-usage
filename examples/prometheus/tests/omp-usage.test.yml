@@ -1,0 +1,97 @@
+# promtool test rules examples/prometheus/tests/omp-usage.test.yml
+rule_files:
+  - ../rules/omp-usage.rules.yml
+  - ../rules/omp-usage.alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: exporter down and stale import
+    interval: 1m
+    input_series:
+      - series: 'up{job="omp_usage", instance="mac:9464"}'
+        values: '1 1 0x10'
+      - series: 'omp_usage_last_import_timestamp_seconds{job="omp_usage", instance="mac:9464"}'
+        values: '0 60 120 120x30'
+      - series: 'omp_usage_last_import_success{job="omp_usage", instance="mac:9464"}'
+        values: '1x30'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: OmpUsageExporterDown
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: OmpUsageExporterDown
+        exp_alerts:
+          - exp_labels: { severity: warning, job: omp_usage, instance: 'mac:9464' }
+            exp_annotations:
+              summary: omp-usage-exporter on mac:9464 is not reachable
+              description: Prometheus cannot scrape the exporter. Usage is still written by the plugin and will be imported when the exporter is back.
+      - eval_time: 16m
+        alertname: OmpUsageImportStale
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: OmpUsageImportStale
+        exp_alerts:
+          - exp_labels: { severity: warning, job: omp_usage, instance: 'mac:9464' }
+            exp_annotations:
+              summary: No successful import for 18m 0s on mac:9464
+              description: The exporter is up but its import cycle is failing or stuck. Check the logs and /healthz.
+
+  - name: high error rate needs enough traffic
+    interval: 1m
+    input_series:
+      # 1 request/min, 50% errors: rate is high but traffic is too low at first
+      - series: 'omp_llm_requests_total{job="omp_usage", provider="p", model="m", status="error"}'
+        values: '0+1x60'
+      - series: 'omp_llm_requests_total{job="omp_usage", provider="p", model="m", status="success"}'
+        values: '0+1x60'
+      - series: 'omp_llm_requests_total{job="omp_usage", provider="p", model="ok", status="success"}'
+        values: '0+5x60'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: OmpLlmHighErrorRate
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: OmpLlmHighErrorRate
+        exp_alerts:
+          - exp_labels: { severity: warning, job: omp_usage, provider: p, model: m }
+            exp_annotations:
+              summary: 'p/m: 50% of requests fail'
+
+  - name: equivalent cost recording rule joins prices
+    interval: 1m
+    input_series:
+      # 6000 input tokens/min at 0.15 USD/1M and 600 output tokens/min at 1 USD/1M
+      - series: 'omp_llm_tokens_total{job="omp_usage", provider="llama.cpp", model="q", direction="input"}'
+        values: '0+6000x20'
+      - series: 'omp_llm_tokens_total{job="omp_usage", provider="llama.cpp", model="q", direction="output"}'
+        values: '0+600x20'
+      - series: 'omp_llm_tokens_total{job="omp_usage", provider="llama.cpp", model="q", direction="cache_write"}'
+        values: '0+100x20' # no price for cache_write: not counted, not zero-priced
+      - series: 'omp_llm_price_usd_per_million_tokens{job="omp_usage", provider="llama.cpp", model="q", direction="input", source="openrouter"}'
+        values: '0.15x20'
+      - series: 'omp_llm_price_usd_per_million_tokens{job="omp_usage", provider="llama.cpp", model="q", direction="output", source="file"}'
+        values: '1x20'
+    promql_expr_test:
+      - expr: provider_model:omp_llm_equivalent_cost_usd:rate5m * 60
+        eval_time: 10m
+        exp_samples:
+          # (6000 * 0.15 + 600 * 1) / 1e6 per minute
+          - labels: '{job="omp_usage", provider="llama.cpp", model="q"}'
+            value: 0.0015
+
+  - name: daily spend
+    interval: 10m
+    input_series:
+      - series: 'omp_llm_reported_cost_usd_total{job="omp_usage", provider="openrouter", model="a"}'
+        values: '0+0.2x200'
+    alert_rule_test:
+      - eval_time: 12h
+        alertname: OmpLlmDailySpendHigh
+        exp_alerts: []
+      - eval_time: 24h
+        alertname: OmpLlmDailySpendHigh
+        exp_alerts:
+          - exp_labels: { severity: warning, job: omp_usage }
+            exp_annotations:
+              summary: Reported LLM spend in the last 24 h is 28.80 USD

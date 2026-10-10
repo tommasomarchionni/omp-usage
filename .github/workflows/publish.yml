@@ -1,115 +1,96 @@
 name: Publish to npm
 
+# Publishing uses npm Trusted Publishing (OIDC) only: no long-lived npm token
+# is stored in the repository. Every release gets a provenance attestation.
+#
+# Triggered by release-please.yml through workflow_dispatch (releases created
+# with GITHUB_TOKEN do not trigger `release` events), or manually for a tag.
 on:
-  release:
-    types: [published]
   workflow_dispatch:
+    inputs:
+      package:
+        description: Package to publish
+        required: true
+        type: choice
+        options: [omp-usage, omp-usage-exporter]
+      tag:
+        description: Release tag (e.g. omp-usage-v0.4.0)
+        required: true
+        type: string
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: publish-${{ inputs.package }}
+  cancel-in-progress: false
 
 jobs:
-  publish-plugin:
-    name: Publish @tommasomarchionni/omp-usage
-    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'omp-usage-v') }}
+  publish:
+    name: Publish ${{ inputs.package }} (${{ inputs.tag }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Configure required reviewers for this environment in the repository
+    # settings, and use it in the npm Trusted Publisher configuration.
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@tommasomarchionni/${{ inputs.package }}
+    permissions:
+      contents: read
+      id-token: write # OIDC for npm Trusted Publishing and provenance
     steps:
-      - uses: actions/checkout@v7
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - name: Validate inputs
+        env:
+          PACKAGE: ${{ inputs.package }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$TAG" =~ ^${PACKAGE}-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::Tag '$TAG' does not match package '$PACKAGE' (expected ${PACKAGE}-vX.Y.Z)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: "22"
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: .nvmrc
           registry-url: https://registry.npmjs.org
           cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Build
-        run: npm run build
-      - name: Validate NPM_TOKEN identity
+
+      - name: Use an npm version with Trusted Publishing support (>= 11.5.1)
+        run: npm install --global npm@11 && npm --version
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:integration
+
+      - name: Check version and registry state
+        id: check
+        working-directory: packages/${{ inputs.package }}
         env:
-          NPM_FALLBACK_TOKEN: ${{ secrets.NPM_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          PACKAGE: ${{ inputs.package }}
         run: |
-          if [ -z "${NPM_FALLBACK_TOKEN:-}" ]; then
-            echo "NPM_TOKEN not configured."
-            exit 0
+          set -euo pipefail
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if [ "${PACKAGE}-v${version}" != "$TAG" ]; then
+            echo "::error::package.json version ${version} does not match tag ${TAG}"
+            exit 1
+          fi
+          if npm view "${name}@${version}" version >/dev/null 2>&1; then
+            echo "::notice::${name}@${version} is already published, skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-          temp_npmrc="$(mktemp)"
-          printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_FALLBACK_TOKEN" > "$temp_npmrc"
-          NPM_CONFIG_USERCONFIG="$temp_npmrc" npm whoami
-          rm -f "$temp_npmrc"
-      - name: Publish plugin package (OIDC, fallback to NPM_TOKEN)
-        working-directory: packages/omp-usage
-        env:
-          NPM_FALLBACK_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set +e
-          npm publish --access public --provenance
-          publish_exit=$?
-          set -e
-
-          if [ "$publish_exit" -eq 0 ]; then
-            exit 0
-          fi
-
-          if [ -z "${NPM_FALLBACK_TOKEN:-}" ]; then
-            echo "OIDC publish failed and NPM_TOKEN is not configured."
-            exit "$publish_exit"
-          fi
-
-          echo "OIDC publish failed, retrying with NPM_TOKEN fallback."
-          printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_FALLBACK_TOKEN" > "$HOME/.npmrc"
-          npm publish --access public
-
-  publish-exporter:
-    name: Publish @tommasomarchionni/omp-usage-exporter
-    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'omp-usage-exporter-v') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          registry-url: https://registry.npmjs.org
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Build
-        run: npm run build
-      - name: Validate NPM_TOKEN identity
-        env:
-          NPM_FALLBACK_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "${NPM_FALLBACK_TOKEN:-}" ]; then
-            echo "NPM_TOKEN not configured."
-            exit 0
-          fi
-
-          temp_npmrc="$(mktemp)"
-          printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_FALLBACK_TOKEN" > "$temp_npmrc"
-          NPM_CONFIG_USERCONFIG="$temp_npmrc" npm whoami
-          rm -f "$temp_npmrc"
-      - name: Publish exporter package (OIDC, fallback to NPM_TOKEN)
-        working-directory: packages/omp-usage-exporter
-        env:
-          NPM_FALLBACK_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set +e
-          npm publish --access public --provenance
-          publish_exit=$?
-          set -e
-
-          if [ "$publish_exit" -eq 0 ]; then
-            exit 0
-          fi
-
-          if [ -z "${NPM_FALLBACK_TOKEN:-}" ]; then
-            echo "OIDC publish failed and NPM_TOKEN is not configured."
-            exit "$publish_exit"
-          fi
-
-          echo "OIDC publish failed, retrying with NPM_TOKEN fallback."
-          printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_FALLBACK_TOKEN" > "$HOME/.npmrc"
-          npm publish --access public
+      - name: Publish with provenance (OIDC)
+        if: steps.check.outputs.skip == 'false'
+        working-directory: packages/${{ inputs.package }}
+        run: npm publish --provenance --access public

@@ -88,3 +88,14 @@ describe('isLoopback', () => {
     expect(isLoopback('192.168.1.10')).toBe(false);
   });
 });
+
+describe('retentionDays', () => {
+  it('is off by default and parses flags/env', () => {
+    expect(resolveConfig({}, {}).retentionDays).toBeNull();
+    expect(resolveConfig({}, { OMP_USAGE_EXPORTER_RETENTION_DAYS: '30' }).retentionDays).toBe(30);
+    expect(resolveConfig({ retentionDays: 'off' }, {}).retentionDays).toBeNull();
+    // The plugin variable must not affect the exporter.
+    expect(resolveConfig({}, { OMP_USAGE_RETENTION_DAYS: '3' }).retentionDays).toBeNull();
+    expect(() => resolveConfig({ retentionDays: '-1' }, {})).toThrow(ConfigError);
+  });
+});

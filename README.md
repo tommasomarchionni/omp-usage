@@ -9,9 +9,9 @@ Live documentation: https://tommasomarchionni.github.io/omp-usage/
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| `@tommasomarchionni/omp-usage` | OMP plugin that collects usage events |
+| Package                                 | Description                                                        |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| `@tommasomarchionni/omp-usage`          | OMP plugin that collects usage events                              |
 | `@tommasomarchionni/omp-usage-exporter` | Node.js service that imports events and exposes Prometheus metrics |
 
 ## Quick Start
@@ -70,6 +70,7 @@ npm uninstall -g @tommasomarchionni/omp-usage-exporter
 ```
 
 The exporter starts on `http://127.0.0.1:9464` with:
+
 - `GET /metrics` — Prometheus metrics
 - `GET /healthz` — Health check
 
@@ -93,26 +94,30 @@ scrape_configs:
       - targets: ['exporter.example.internal:9464']
 ```
 
-### 4. Import the Grafana dashboard
+### 4. Provision the Grafana dashboards
 
-See `docs/grafana.md` for the dashboard JSON.
+Eleven dashboards (overview, tokens, time patterns, reported cost, equivalent
+cost and savings, reference models, efficiency, reliability, model drilldown,
+local models vs llama.cpp, exporter health) are in
+`examples/grafana/dashboards/`, with provisioning files, Prometheus rules and
+alerts in `examples/`. See [docs/grafana.md](docs/grafana.md).
 
 ## Documentation
 
-| Topic | Link |
-|-------|------|
-| Installation | [docs/installation.md](docs/installation.md) |
-| Configuration | [docs/configuration.md](docs/configuration.md) |
-| Plugin | [docs/plugin.md](docs/plugin.md) |
-| Exporter | [docs/exporter.md](docs/exporter.md) |
-| Metrics | [docs/metrics.md](docs/metrics.md) |
-| Prometheus | [docs/prometheus.md](docs/prometheus.md) |
-| Grafana | [docs/grafana.md](docs/grafana.md) |
-| launchd (macOS) | [docs/launchd.md](docs/launchd.md) |
-| Troubleshooting | [docs/troubleshooting.md](docs/troubleshooting.md) |
-| Persistence & Recovery | [docs/persistence.md](docs/persistence.md) |
-| Shutdown | [docs/shutdown.md](docs/shutdown.md) |
-| Testing | [docs/testing.md](docs/testing.md) |
+| Topic                  | Link                                               |
+| ---------------------- | -------------------------------------------------- |
+| Installation           | [docs/installation.md](docs/installation.md)       |
+| Configuration          | [docs/configuration.md](docs/configuration.md)     |
+| Plugin                 | [docs/plugin.md](docs/plugin.md)                   |
+| Exporter               | [docs/exporter.md](docs/exporter.md)               |
+| Metrics                | [docs/metrics.md](docs/metrics.md)                 |
+| Prometheus             | [docs/prometheus.md](docs/prometheus.md)           |
+| Grafana                | [docs/grafana.md](docs/grafana.md)                 |
+| launchd (macOS)        | [docs/launchd.md](docs/launchd.md)                 |
+| Troubleshooting        | [docs/troubleshooting.md](docs/troubleshooting.md) |
+| Persistence & Recovery | [docs/persistence.md](docs/persistence.md)         |
+| Shutdown               | [docs/shutdown.md](docs/shutdown.md)               |
+| Testing                | [docs/testing.md](docs/testing.md)                 |
 
 ## Release and Publishing
 
@@ -142,13 +147,13 @@ See `docs/grafana.md` for the dashboard JSON.
 
 ## Metrics
 
-| Metric | Type | Labels |
-|--------|------|--------|
-| `omp_llm_tokens_total` | Counter | provider, model, direction |
-| `omp_llm_reasoning_tokens_total` | Counter | provider, model |
-| `omp_llm_requests_total` | Counter | provider, model, status |
-| `omp_llm_reported_cost_usd_total` | Counter | provider, model |
-| `omp_llm_usage_missing_total` | Counter | provider, model |
+| Metric                            | Type    | Labels                     |
+| --------------------------------- | ------- | -------------------------- |
+| `omp_llm_tokens_total`            | Counter | provider, model, direction |
+| `omp_llm_reasoning_tokens_total`  | Counter | provider, model            |
+| `omp_llm_requests_total`          | Counter | provider, model, status    |
+| `omp_llm_reported_cost_usd_total` | Counter | provider, model            |
+| `omp_llm_usage_missing_total`     | Counter | provider, model            |
 
 Plus operational metrics: import errors, invalid records, last import timestamp.
 
