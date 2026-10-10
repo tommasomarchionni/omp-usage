@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -37,6 +37,8 @@ export function line(event: Record<string, unknown>): string {
 }
 
 export function tempDir(prefix = 'omp-usage-test-'): { path: string; cleanup: () => void } {
-  const path = mkdtempSync(join(tmpdir(), prefix));
+  // realpath: on macOS tmpdir() is under /var, a symlink to /private/var, and
+  // the importer keys cursors by real path.
+  const path = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
   return { path, cleanup: () => rmSync(path, { recursive: true, force: true }) };
 }
