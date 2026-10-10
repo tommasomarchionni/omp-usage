@@ -2,6 +2,21 @@
   "name": "@tommasomarchionni/omp-usage-exporter",
   "version": "0.2.2",
   "description": "Node.js service that imports OMP usage events and exposes Prometheus metrics",
+  "keywords": [
+    "omp",
+    "oh-my-pi",
+    "prometheus",
+    "exporter",
+    "llm",
+    "usage",
+    "tokens",
+    "cost",
+    "grafana"
+  ],
+  "homepage": "https://tommasomarchionni.github.io/omp-usage/exporter/",
+  "bugs": {
+    "url": "https://github.com/tommasomarchionni/omp-usage/issues"
+  },
   "type": "module",
   "license": "MIT",
   "author": "Tommaso Marchionni",

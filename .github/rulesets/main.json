@@ -27,6 +27,7 @@
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
           { "context": "Lint & TypeCheck" },
+          { "context": "Conventional PR title" },
           { "context": "Test (ubuntu-latest, Node 22)" },
           { "context": "Test (ubuntu-latest, Node 24)" },
           { "context": "Test (macos-latest, Node 22)" },

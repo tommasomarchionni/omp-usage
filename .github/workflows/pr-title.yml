@@ -1,0 +1,46 @@
+name: PR title
+
+# Squash merge uses the PR title as the commit message read by release-please.
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  conventional-title:
+    name: Conventional PR title
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      pull-requests: read
+    steps:
+      # Does not check out or run code from the pull request.
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            docs
+            test
+            build
+            ci
+            chore
+            style
+            revert
+          scopes: |
+            plugin
+            exporter
+            protocol
+            docs
+            ci
+            deps
+            deps-dev
+            grafana
+            main
+          requireScope: false

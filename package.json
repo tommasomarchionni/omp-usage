@@ -23,7 +23,8 @@
     "pack": "npm pack --workspaces --ignore-scripts",
     "docs:serve": "mkdocs serve -f docs/mkdocs.yml",
     "docs:build": "mkdocs build -f docs/mkdocs.yml --strict",
-    "test:integration": "npm run test:integration --workspaces --if-present"
+    "test:integration": "npm run test:integration --workspaces --if-present",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run test:integration"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -34,10 +35,11 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
     "husky": "^9.0.0",
+    "lint-staged": "^17.6.0",
     "prettier": "^3.3.0",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.3",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -46,5 +48,12 @@
     "better-sqlite3@13.0.3": true,
     "esbuild@0.28.2": true,
     "fsevents@2.3.3": true
+  },
+  "lint-staged": {
+    "*.{ts,js,mjs,cjs}": [
+      "eslint --fix --no-warn-ignored",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": "prettier --write"
   }
 }
