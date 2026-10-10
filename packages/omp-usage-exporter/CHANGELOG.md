@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/tommasomarchionni/omp-usage/compare/omp-usage-exporter-v0.2.2...omp-usage-exporter-v1.0.0) (2026-10-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **exporter:** continuous, crash-safe incremental import ([#22](https://github.com/tommasomarchionni/omp-usage/issues/22))
+
+### Bug Fixes
+
+* **exporter:** continuous, crash-safe incremental import ([#22](https://github.com/tommasomarchionni/omp-usage/issues/22)) ([9cbce5a](https://github.com/tommasomarchionni/omp-usage/commit/9cbce5a0bb67ac680de8004b76d2b8704fdd9743))
+
 ## [0.2.2](https://github.com/tommasomarchionni/omp-usage/compare/omp-usage-exporter-v0.2.1...omp-usage-exporter-v0.2.2) (2026-10-10)
 
 
