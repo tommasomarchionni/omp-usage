@@ -73,6 +73,17 @@ The exporter starts on `http://127.0.0.1:9464` with:
 - `GET /metrics` — Prometheus metrics
 - `GET /healthz` — Health check
 
+### 2b. Runtime plugin controls
+
+Inside OMP chat you can inspect and tune retention without restart:
+
+```text
+/omp-usage status
+/omp-usage retention 14
+/omp-usage retention off
+/omp-usage prune
+```
+
 ### 3. Configure Prometheus
 
 ```yaml

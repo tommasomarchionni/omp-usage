@@ -87,6 +87,25 @@ Each file contains one JSON object per line (JSONL format).
 - **Non-blocking**: If queue is full, new events are dropped (logged as warning)
 - **Graceful shutdown**: Flushes queue on OMP shutdown
 
+## Retention
+
+- **Default retention**: 30 days (`OMP_USAGE_RETENTION_DAYS=30`)
+- **Disable retention**: set `OMP_USAGE_RETENTION_DAYS=off` (or `0`)
+- **Cleanup cadence**: periodic background prune plus prune-after-flush
+- **Scope**: deletes old `*.jsonl` files from events directory (keeps current session file)
+
+### Runtime control
+
+Use slash commands from OMP chat:
+
+```text
+/omp-usage status
+/omp-usage retention
+/omp-usage retention 7
+/omp-usage retention off
+/omp-usage prune
+```
+
 ## Permissions
 
 - Directory: `0o700` (owner only)

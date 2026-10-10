@@ -7,10 +7,16 @@ All configuration is done via environment variables or CLI flags. CLI flags take
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
 | `OMP_USAGE_EVENTS_DIR` | `~/.local/state/omp-usage/events` | Directory where event JSONL files are written |
+| `OMP_USAGE_MAX_QUEUE_SIZE` | `1000` | Maximum in-memory events before new events are dropped |
+| `OMP_USAGE_FLUSH_INTERVAL_MS` | `1000` | Flush cadence to append queued events to JSONL |
+| `OMP_USAGE_RETENTION_DAYS` | `30` | Retention period for `.jsonl` files; set `off` or `0` to disable |
 
 Example:
 ```bash
 export OMP_USAGE_EVENTS_DIR=/custom/path/events
+export OMP_USAGE_MAX_QUEUE_SIZE=2000
+export OMP_USAGE_FLUSH_INTERVAL_MS=500
+export OMP_USAGE_RETENTION_DAYS=14
 ```
 
 Or via OMP config (if supported by your OMP version):
@@ -26,6 +32,22 @@ Or via OMP config (if supported by your OMP version):
   }
 }
 ```
+
+## Runtime Commands
+
+The plugin registers `/omp-usage` commands for runtime operations:
+
+```text
+/omp-usage status
+/omp-usage retention
+/omp-usage retention 14
+/omp-usage retention off
+/omp-usage prune
+```
+
+- `status`: shows current queue/file/retention state.
+- `retention`: reads or updates retention without restarting OMP.
+- `prune`: immediately runs retention cleanup.
 
 ## Exporter Configuration
 

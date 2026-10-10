@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { EventWriter, resolveEventsDir, createPluginConfig } from "./writer.js";
 import { createEvent, type UsageEvent } from "@tommasomarchionni/omp-usage-protocol";
-import { rmSync, mkdirSync, existsSync, readFileSync, statSync } from "node:fs";
+import { rmSync, mkdirSync, existsSync, readFileSync, statSync, writeFileSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 describe("resolveEventsDir", () => {
@@ -30,12 +30,39 @@ describe("createPluginConfig", () => {
     expect(config.flushIntervalMs).toBe(1000);
     expect(config.fileMode).toBe(0o600);
     expect(config.dirMode).toBe(0o700);
+    expect(config.retentionDays).toBe(30);
   });
 
   it("overrides provided values", () => {
-    const config = createPluginConfig({ maxQueueSize: 500, flushIntervalMs: 500 });
+    const config = createPluginConfig({ maxQueueSize: 500, flushIntervalMs: 500, retentionDays: 7 });
     expect(config.maxQueueSize).toBe(500);
     expect(config.flushIntervalMs).toBe(500);
+    expect(config.retentionDays).toBe(7);
+  });
+
+  it("reads env configuration", () => {
+    process.env.OMP_USAGE_EVENTS_DIR = "/tmp/omp-usage-env";
+    process.env.OMP_USAGE_MAX_QUEUE_SIZE = "42";
+    process.env.OMP_USAGE_FLUSH_INTERVAL_MS = "2500";
+    process.env.OMP_USAGE_RETENTION_DAYS = "14";
+
+    const config = createPluginConfig({});
+    expect(config.eventsDir).toContain("/tmp/omp-usage-env");
+    expect(config.maxQueueSize).toBe(42);
+    expect(config.flushIntervalMs).toBe(2500);
+    expect(config.retentionDays).toBe(14);
+
+    delete process.env.OMP_USAGE_EVENTS_DIR;
+    delete process.env.OMP_USAGE_MAX_QUEUE_SIZE;
+    delete process.env.OMP_USAGE_FLUSH_INTERVAL_MS;
+    delete process.env.OMP_USAGE_RETENTION_DAYS;
+  });
+
+  it("supports turning retention off from env", () => {
+    process.env.OMP_USAGE_RETENTION_DAYS = "off";
+    const config = createPluginConfig({});
+    expect(config.retentionDays).toBeNull();
+    delete process.env.OMP_USAGE_RETENTION_DAYS;
   });
 });
 
@@ -124,6 +151,37 @@ describe("EventWriter", () => {
     const ok = smallWriter.write(createTestEvent());
     expect(ok).toBe(false);
     expect(smallWriter.getQueueLength()).toBe(2);
+  });
+
+  it("prunes old jsonl files based on retention", () => {
+    const oldFile = join(testDir, "old-session.jsonl");
+    const recentFile = join(testDir, "recent-session.jsonl");
+
+    writeFileSync(oldFile, "{}\n", "utf8");
+    writeFileSync(recentFile, "{}\n", "utf8");
+
+    const now = Date.now();
+    const oldDate = new Date(now - 10 * 24 * 60 * 60 * 1000);
+    const recentDate = new Date(now - 1 * 24 * 60 * 60 * 1000);
+    utimesSync(oldFile, oldDate, oldDate);
+    utimesSync(recentFile, recentDate, recentDate);
+
+    const config = createPluginConfig({ eventsDir: testDir, retentionDays: 3 });
+    const retentionWriter = new EventWriter(sessionRunId, config);
+    const deleted = retentionWriter.pruneOldFiles();
+
+    expect(deleted).toBeGreaterThanOrEqual(0);
+    expect(existsSync(oldFile)).toBe(false);
+    expect(existsSync(recentFile)).toBe(true);
+  });
+
+  it("updates retention at runtime", () => {
+    const config = createPluginConfig({ eventsDir: testDir, retentionDays: 30 });
+    const runtimeWriter = new EventWriter(sessionRunId, config);
+    expect(runtimeWriter.getRetentionDays()).toBe(30);
+
+    runtimeWriter.setRetentionDays(null);
+    expect(runtimeWriter.getRetentionDays()).toBeNull();
   });
 
   it("returns false after close", async () => {

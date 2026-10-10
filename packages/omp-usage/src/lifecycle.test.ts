@@ -5,11 +5,16 @@ describe("initializePlugin", () => {
   let mockApi: OmpApi;
   let messageEndHandler: ((event: { message: unknown }) => void) | null;
   let shutdownHandler: (() => void | Promise<void>) | null;
+  let commandHandler: ((args: string, ctx: { ui?: { notify?: (message: string, type?: string) => void } }) =>
+    | void
+    | Promise<void>)
+    | null;
   let config: Partial<PluginConfig>;
 
   beforeEach(() => {
     messageEndHandler = null;
     shutdownHandler = null;
+    commandHandler = null;
     config = { eventsDir: "/tmp/test-events", maxQueueSize: 100 };
 
     mockApi = {
@@ -20,6 +25,9 @@ describe("initializePlugin", () => {
           shutdownHandler = handler as () => void | Promise<void>;
         }
       },
+      registerCommand: (_name, options) => {
+        commandHandler = options.handler;
+      },
     };
   });
 
@@ -27,7 +35,36 @@ describe("initializePlugin", () => {
     const _cleanup = initializePlugin(mockApi, config);
     expect(messageEndHandler).not.toBeNull();
     expect(shutdownHandler).not.toBeNull();
+    expect(commandHandler).not.toBeNull();
     expect(typeof _cleanup).toBe("function");
+  });
+
+  it("returns status via /omp-usage status", async () => {
+    initializePlugin(mockApi, config);
+    const notifications: string[] = [];
+    await commandHandler!("status", {
+      ui: {
+        notify: (message) => notifications.push(message),
+      },
+    });
+    expect(notifications[0]).toContain("retention=");
+    expect(notifications[0]).toContain("eventsDir=");
+  });
+
+  it("updates retention via /omp-usage retention", async () => {
+    initializePlugin(mockApi, config);
+    const notifications: string[] = [];
+    const ctx = {
+      ui: {
+        notify: (message: string) => notifications.push(message),
+      },
+    };
+
+    await commandHandler!("retention 5", ctx);
+    await commandHandler!("retention", ctx);
+
+    expect(notifications.some((line) => line.includes("Retention updated to 5 days"))).toBe(true);
+    expect(notifications.some((line) => line.includes("Current retention: 5 days"))).toBe(true);
   });
 
   it("calls shutdown handler on shutdown event", async () => {
