@@ -94,9 +94,13 @@ scrape_configs:
       - targets: ['exporter.example.internal:9464']
 ```
 
-### 4. Import the Grafana dashboard
+### 4. Provision the Grafana dashboards
 
-See `docs/grafana.md` for the dashboard JSON.
+Eleven dashboards (overview, tokens, time patterns, reported cost, equivalent
+cost and savings, reference models, efficiency, reliability, model drilldown,
+local models vs llama.cpp, exporter health) are in
+`examples/grafana/dashboards/`, with provisioning files, Prometheus rules and
+alerts in `examples/`. See [docs/grafana.md](docs/grafana.md).
 
 ## Documentation
 

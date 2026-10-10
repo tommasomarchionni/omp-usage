@@ -1,0 +1,96 @@
+# Example alerts. Thresholds are starting points: tune them to your usage.
+groups:
+  - name: omp-usage-exporter
+    rules:
+      - alert: OmpUsageExporterDown
+        expr: up{job="omp_usage"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: omp-usage-exporter on {{ $labels.instance }} is not reachable
+          description: Prometheus cannot scrape the exporter. Usage is still written by the plugin and will be imported when the exporter is back.
+
+      - alert: OmpUsageImportStale
+        expr: time() - omp_usage_last_import_timestamp_seconds{job="omp_usage"} > 600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: No successful import for {{ $value | humanizeDuration }} on {{ $labels.instance }}
+          description: The exporter is up but its import cycle is failing or stuck. Check the logs and /healthz.
+
+      - alert: OmpUsageImportFailing
+        expr: omp_usage_last_import_success{job="omp_usage"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Import cycles on {{ $labels.instance }} are failing
+
+      - alert: OmpUsageInvalidRecords
+        expr: sum by (job, instance, reason) (increase(omp_usage_invalid_records_total{job="omp_usage"}[1h])) > 10
+        labels:
+          severity: info
+        annotations:
+          summary: '{{ $value }} invalid event lines ({{ $labels.reason }}) in the last hour'
+          description: Plugin and exporter versions may be out of sync, or a file is corrupted.
+
+      - alert: OmpUsageLabelOverflow
+        expr: omp_usage_label_overflow_pairs{job="omp_usage"} > 0
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: '{{ $value }} provider/model pairs are folded into _other'
+          description: Raise --max-label-cardinality; usage is still counted under _other.
+
+      - alert: OmpUsagePricingUnresolved
+        expr: max by (job, instance, kind, name) (omp_usage_pricing_unresolved{job="omp_usage"}) > 0
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: 'Pricing entry {{ $labels.name }} has no price'
+          description: The OpenRouter id is unknown or the catalog is not loaded. Run omp-usage-exporter --print-prices.
+
+      - alert: OmpUsagePriceCatalogStale
+        expr: time() - omp_usage_pricing_catalog_updated_timestamp_seconds{job="omp_usage"} > 3 * 86400
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: OpenRouter price catalog is {{ $value | humanizeDuration }} old
+
+  - name: omp-usage-llm
+    rules:
+      - alert: OmpLlmHighErrorRate
+        expr: |
+          (
+            sum by (job, provider, model) (increase(omp_llm_requests_total{status="error"}[30m]))
+            /
+            sum by (job, provider, model) (increase(omp_llm_requests_total[30m]))
+          ) > 0.2
+          and
+          sum by (job, provider, model) (increase(omp_llm_requests_total[30m])) >= 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.provider }}/{{ $labels.model }}: {{ $value | humanizePercentage }} of requests fail'
+
+      - alert: OmpLlmDailySpendHigh
+        # Reported cost in the last 24 h. Change 20 to your daily budget in USD.
+        expr: sum by (job) (increase(omp_llm_reported_cost_usd_total[1d])) > 20
+        labels:
+          severity: warning
+        annotations:
+          summary: Reported LLM spend in the last 24 h is {{ $value | printf "%.2f" }} USD
+
+      - alert: OmpLlmUsageMissing
+        expr: sum by (job, provider, model) (increase(omp_llm_usage_missing_total[1h])) > 5
+        labels:
+          severity: info
+        annotations:
+          summary: '{{ $labels.provider }}/{{ $labels.model }} returns messages without usage'
+          description: These requests are counted but their tokens and cost are unknown (missing is not zero).

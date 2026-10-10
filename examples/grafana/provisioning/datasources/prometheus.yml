@@ -1,0 +1,14 @@
+# Grafana datasource provisioning. The dashboards default to uid "prometheus".
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      # Must match the Prometheus scrape interval of job omp_usage, so that
+      # $__rate_interval and short buckets cover at least 4 scrapes.
+      timeInterval: 30s
+      httpMethod: POST
