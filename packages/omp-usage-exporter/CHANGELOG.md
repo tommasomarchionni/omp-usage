@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/tommasomarchionni/omp-usage/compare/omp-usage-exporter-v0.2.1...omp-usage-exporter-v0.2.2) (2026-10-10)
+
+
+### Bug Fixes
+
+* **exporter:** make npx cli executable and self-contained ([3d1c649](https://github.com/tommasomarchionni/omp-usage/commit/3d1c6499ea39bb12d59a876b7c1fcd934e235f03))
+
 ## [0.2.1](https://github.com/tommasomarchionni/omp-usage/compare/omp-usage-exporter-v0.2.0...omp-usage-exporter-v0.2.1) (2026-10-10)
 
 
