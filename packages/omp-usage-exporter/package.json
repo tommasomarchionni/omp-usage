@@ -49,7 +49,7 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.4",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.3",
+    "vitest": "^5.0.5",
     "@tommasomarchionni/omp-usage-protocol": "0.1.0",
     "esbuild": "^0.28.2"
   },
