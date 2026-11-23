@@ -41,9 +41,9 @@
   },
   "dependencies": {
     "@prometheus-io/client": "^0.16.1",
-    "better-sqlite3": "^13.0.0",
-    "commander": "^15.0.0",
-    "zod": "^4.6.5"
+    "better-sqlite3": "^13.2.0",
+    "commander": "^15.1.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
